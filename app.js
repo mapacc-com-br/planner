@@ -8,17 +8,17 @@ const STORAGE_KEYS = {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_CATEGORIES = [
-  { name: "Moradia", color: "#2f7d5c" },
-  { name: "Cartao", color: "#5f5aa2" },
-  { name: "Mercado", color: "#2d6f95" },
-  { name: "Saude", color: "#b64c57" },
-  { name: "Transporte", color: "#72844b" },
-  { name: "Assinaturas", color: "#b9792d" },
-  { name: "Educacao", color: "#6d6f78" },
-  { name: "Lazer", color: "#8860a8" },
-  { name: "Impostos", color: "#9a5a42" },
-  { name: "Investimentos", color: "#287276" },
-  { name: "Outros", color: "#697377" },
+  { name: "Moradia", color: "#2478c7" },
+  { name: "Cartao", color: "#6c69b1" },
+  { name: "Mercado", color: "#3f95dc" },
+  { name: "Saude", color: "#bf5b64" },
+  { name: "Transporte", color: "#2f8b80" },
+  { name: "Assinaturas", color: "#c38a2e" },
+  { name: "Educacao", color: "#4d789f" },
+  { name: "Lazer", color: "#d96c63" },
+  { name: "Impostos", color: "#9b6a4b" },
+  { name: "Investimentos", color: "#2f8b80" },
+  { name: "Outros", color: "#7c8fa3" },
 ];
 
 const currency = new Intl.NumberFormat("pt-BR", {

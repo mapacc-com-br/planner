@@ -10,12 +10,12 @@ const shortDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 });
 
 const assetTypes = [
-  { name: "Investimento", color: "#2f7d5c", icon: "line-chart" },
-  { name: "Reserva", color: "#2d6f95", icon: "wallet" },
-  { name: "Imovel", color: "#5f5aa2", icon: "house" },
-  { name: "Veiculo", color: "#b9792d", icon: "car" },
-  { name: "Conta", color: "#287276", icon: "landmark" },
-  { name: "Outros", color: "#697377", icon: "archive" },
+  { name: "Investimento", color: "#2f8b80", icon: "line-chart" },
+  { name: "Reserva", color: "#2478c7", icon: "wallet" },
+  { name: "Imovel", color: "#6c69b1", icon: "house" },
+  { name: "Veiculo", color: "#c38a2e", icon: "car" },
+  { name: "Conta", color: "#3f95dc", icon: "landmark" },
+  { name: "Outros", color: "#7c8fa3", icon: "archive" },
 ];
 
 let assets = [];
@@ -153,7 +153,7 @@ function renderAssetTypeMap() {
 
 function renderLiquidityMap() {
   const liquidityOrder = ["D0", "D1", "Ate 30 dias", "Longo prazo", "Nao liquido"];
-  const colors = ["#2f7d5c", "#2d6f95", "#b9792d", "#5f5aa2", "#697377"];
+  const colors = ["#2f8b80", "#2478c7", "#c38a2e", "#6c69b1", "#7c8fa3"];
   const totals = liquidityOrder
     .map((name, index) => ({
       name,
