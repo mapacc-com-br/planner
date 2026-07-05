@@ -81,3 +81,22 @@ Opcoes boas:
 - Rodar em um computador/NAS de casa e acessar por VPN/Tailscale/Cloudflare Tunnel.
 - Hospedar em um servidor Node com disco persistente para o SQLite.
 - Usar GitHub Pages apenas como demo estatica, sem as rotas de API e sem gravacao.
+
+### Railway
+
+O projeto esta pronto para Railway:
+
+- Railway fornece `PORT`, e o servidor usa essa porta automaticamente.
+- Em Railway, o servidor escuta em `0.0.0.0`.
+- Se houver volume conectado, o SQLite usa `RAILWAY_VOLUME_MOUNT_PATH`.
+
+Passos:
+
+1. Criar um projeto no Railway.
+2. Adicionar o repositorio `mapacc-com-br/planner`.
+3. Criar um Volume no servico.
+4. Montar o volume em `/data`.
+5. Fazer deploy.
+6. Gerar um dominio publico no servico.
+
+Sem volume, o deploy funciona, mas os dados podem ser perdidos entre redeploys.

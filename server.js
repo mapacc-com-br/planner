@@ -5,10 +5,11 @@ const path = require("path");
 const { DatabaseSync } = require("node:sqlite");
 
 const root = __dirname;
-const dataDir = path.join(root, "data");
+const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR || path.join(root, "data");
 const backupDir = path.join(dataDir, "backups");
 const dbPath = path.join(dataDir, "planner-financeiro.sqlite");
 const port = Number(process.env.PORT || process.argv[2] || 80);
+const host = process.env.RAILWAY_ENVIRONMENT_ID ? "0.0.0.0" : process.env.HOST || "127.0.0.1";
 
 fs.mkdirSync(dataDir, { recursive: true });
 fs.mkdirSync(backupDir, { recursive: true });
@@ -43,7 +44,7 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(port, "127.0.0.1", () => {
+server.listen(port, host, () => {
   console.log(`Planner financeiro running at http://localhost${port === 80 ? "" : `:${port}`}`);
   console.log(`SQLite database: ${dbPath}`);
 });
