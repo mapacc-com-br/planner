@@ -156,6 +156,12 @@ async function loadInitialState() {
     return;
   }
 
+  if (!hasLocalData && !isLocalHost()) {
+    applyState(state);
+    saveLocalSnapshot();
+    return;
+  }
+
   const seed = hasLocalData ? localSnapshot : createDemoData();
   const imported = await apiRequest("/api/import-local", {
     method: "POST",
@@ -716,6 +722,10 @@ function loadCollection(key) {
   } catch {
     return [];
   }
+}
+
+function isLocalHost() {
+  return ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
 }
 
 function snapshotsDiffer(localSnapshot, databaseSnapshot) {
