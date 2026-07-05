@@ -1,0 +1,767 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f7f4;
+  --surface: #ffffff;
+  --surface-strong: #eef4f0;
+  --text: #1d2a2f;
+  --muted: #647276;
+  --line: #dfe8e4;
+  --green: #2f7d5c;
+  --green-soft: #e5f3eb;
+  --amber: #b9792d;
+  --amber-soft: #fff0d6;
+  --red: #b64c57;
+  --red-soft: #fae4e8;
+  --blue: #2d6f95;
+  --blue-soft: #e0f0f7;
+  --violet: #5f5aa2;
+  --violet-soft: #ebe9fb;
+  --shadow: 0 18px 45px rgba(25, 39, 44, 0.08);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(47, 125, 92, 0.08), rgba(245, 247, 244, 0) 260px),
+    var(--bg);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  height: 100vh;
+  padding: 22px 12px;
+  border-right: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(18px);
+}
+
+.sidebar-mark,
+.brand-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #245f55;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-button,
+.icon-button {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+  background: transparent;
+  transition: 160ms ease;
+}
+
+.sidebar-button:hover,
+.sidebar-button.is-active,
+.icon-button:hover {
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.workspace {
+  width: min(1480px, 100%);
+  margin: 0 auto;
+  padding: 28px;
+}
+
+.topbar,
+.month-strip,
+.panel-header,
+.modal-header,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.topbar {
+  margin-bottom: 28px;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(1.8rem, 3vw, 2.7rem);
+  line-height: 1.05;
+}
+
+h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.45rem, 2vw, 2rem);
+}
+
+h3 {
+  margin-bottom: 0;
+  font-size: 1.02rem;
+}
+
+.actor-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.actor-button {
+  min-width: 86px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.actor-button.is-active {
+  color: #ffffff;
+  background: #245f55;
+}
+
+.month-strip {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.month-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text-button,
+.compact-button,
+.primary-button,
+.ghost-button,
+.danger-button,
+.mark-button,
+.fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 8px;
+  font-weight: 760;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.text-button,
+.ghost-button {
+  padding: 0 15px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.compact-button,
+.primary-button,
+.mark-button,
+.fab {
+  padding: 0 16px;
+  color: #ffffff;
+  background: #245f55;
+}
+
+.recovery-button {
+  background: #5f5aa2;
+}
+
+.danger-button {
+  padding: 0 14px;
+  color: var(--red);
+  border: 1px solid var(--red-soft);
+  background: var(--red-soft);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.summary-card {
+  min-height: 132px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.summary-card .summary-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 16px;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.summary-card.income .summary-icon,
+.status-paid {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.summary-card.bills .summary-icon,
+.status-due-soon {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.summary-card.paid .summary-icon {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.summary-card.pending .summary-icon,
+.status-overdue {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.summary-card.balance .summary-icon,
+.status-pending,
+.status-today {
+  color: var(--violet);
+  background: var(--violet-soft);
+}
+
+.summary-card strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: clamp(1.25rem, 2vw, 1.62rem);
+  line-height: 1.05;
+}
+
+.summary-card span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.focus-grid,
+.ledger-grid {
+  display: grid;
+  align-items: start;
+  gap: 18px;
+}
+
+.focus-grid {
+  grid-template-columns: minmax(0, 1.24fr) minmax(340px, 0.76fr);
+  margin-bottom: 18px;
+}
+
+.ledger-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.38fr);
+}
+
+.side-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--shadow);
+}
+
+.panel-header {
+  margin-bottom: 16px;
+}
+
+.count-pill,
+.status-pill,
+.owner-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.count-pill {
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+.count-pill.positive {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.status-pill,
+.owner-pill {
+  border-radius: 8px;
+}
+
+.owner-pill {
+  color: var(--muted);
+  background: var(--surface-strong);
+}
+
+.bill-list,
+.revenue-list,
+.category-map {
+  display: grid;
+  gap: 10px;
+}
+
+.bill-row,
+.asset-row,
+.revenue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 76px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left-width: 5px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.bill-row.paid {
+  border-left-color: var(--green);
+}
+
+.bill-row.overdue {
+  border-left-color: var(--red);
+}
+
+.bill-row.today {
+  border-left-color: var(--violet);
+}
+
+.bill-row.due-soon {
+  border-left-color: var(--amber);
+}
+
+.bill-row.pending {
+  border-left-color: #9aa7a9;
+}
+
+.asset-row.investimento {
+  border-left-color: var(--green);
+}
+
+.asset-row.reserva {
+  border-left-color: var(--blue);
+}
+
+.asset-row.imovel {
+  border-left-color: var(--violet);
+}
+
+.asset-row.veiculo {
+  border-left-color: var(--amber);
+}
+
+.asset-row.conta,
+.asset-row.outros {
+  border-left-color: #9aa7a9;
+}
+
+.bill-main {
+  min-width: 0;
+}
+
+.bill-title-line,
+.asset-title-line,
+.bill-meta,
+.asset-meta,
+.bill-actions,
+.asset-actions,
+.revenue-meta,
+.revenue-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bill-title-line {
+  margin-bottom: 8px;
+}
+
+.bill-title-line strong,
+.asset-title-line strong,
+.revenue-row strong {
+  font-size: 1rem;
+}
+
+.bill-value,
+.asset-value {
+  font-size: 1.08rem;
+  font-weight: 850;
+}
+
+.bill-meta,
+.asset-meta,
+.revenue-meta {
+  color: var(--muted);
+  font-size: 0.87rem;
+}
+
+.bill-actions,
+.asset-actions,
+.revenue-actions {
+  justify-content: flex-end;
+}
+
+.patrimony-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.dense .bill-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.compact .bill-row {
+  grid-template-columns: 1fr;
+}
+
+.compact .bill-actions {
+  justify-content: flex-start;
+}
+
+.category-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.category-row:last-child {
+  border-bottom: 0;
+}
+
+.category-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+.category-track {
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+}
+
+.category-fill {
+  width: var(--fill, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--bar, #245f55);
+}
+
+.empty-state {
+  display: grid;
+  min-height: 130px;
+  place-items: center;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.fab {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  min-height: 48px;
+  box-shadow: 0 16px 36px rgba(36, 95, 85, 0.28);
+}
+
+.toast {
+  position: fixed;
+  right: 28px;
+  bottom: 90px;
+  z-index: 10;
+  max-width: min(420px, calc(100vw - 28px));
+  padding: 13px 16px;
+  color: #ffffff;
+  border-radius: 8px;
+  background: #1d2a2f;
+  box-shadow: 0 18px 45px rgba(25, 39, 44, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: 180ms ease;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.modal {
+  width: min(640px, calc(100vw - 24px));
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.modal::backdrop {
+  background: rgba(21, 31, 35, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.modal-body {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 30px 80px rgba(21, 31, 35, 0.24);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 760;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--surface);
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.icon-button:focus-visible,
+.text-button:focus-visible,
+.compact-button:focus-visible,
+.primary-button:focus-visible,
+.ghost-button:focus-visible,
+.danger-button:focus-visible,
+.actor-button:focus-visible,
+.fab:focus-visible {
+  outline: 3px solid rgba(45, 111, 149, 0.22);
+  outline-offset: 2px;
+}
+
+.modal-actions {
+  margin-top: 4px;
+}
+
+@media (max-width: 1180px) {
+  .summary-grid {
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+  }
+
+  .focus-grid,
+  .ledger-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .workspace {
+    padding: 18px 14px 92px;
+  }
+
+  .topbar,
+  .month-strip,
+  .panel-header,
+  .modal-header,
+  .modal-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .brand-block,
+  .top-actions,
+  .month-actions,
+  .actor-switch {
+    width: 100%;
+  }
+
+  .top-actions {
+    flex-direction: column;
+  }
+
+  .actor-button,
+  .top-actions > .compact-button,
+  .month-actions > button,
+  .modal-actions > button {
+    flex: 1;
+    width: 100%;
+  }
+
+  .summary-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+.bill-row,
+.asset-row,
+  .revenue-row,
+  .dense .bill-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bill-actions,
+  .asset-actions,
+  .revenue-actions {
+    justify-content: flex-start;
+  }
+
+  .fab {
+    right: 14px;
+    bottom: 14px;
+    left: 14px;
+  }
+
+  .toast {
+    right: 14px;
+    bottom: 76px;
+    left: 14px;
+    max-width: none;
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "planner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Planner financeiro familiar com SQLite local.",
+  "scripts": {
+    "start": "node server.js 8080"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patrimonio</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacao principal">
+        <div class="sidebar-mark" aria-hidden="true">
+          <i data-lucide="calendar-check"></i>
+        </div>
+        <nav class="sidebar-nav">
+          <a class="sidebar-button" href="./index.html" title="Planner financeiro" aria-label="Planner financeiro">
+            <i data-lucide="home"></i>
+          </a>
+          <a class="sidebar-button is-active" href="./patrimonio.html" title="Patrimonio" aria-label="Patrimonio">
+            <i data-lucide="landmark"></i>
+          </a>
+          <button class="sidebar-button" title="Contas" aria-label="Contas">
+            <i data-lucide="receipt-text"></i>
+          </button>
+          <button class="sidebar-button" title="Receitas" aria-label="Receitas">
+            <i data-lucide="wallet-cards"></i>
+          </button>
+          <button class="sidebar-button" title="Relatorios" aria-label="Relatorios">
+            <i data-lucide="chart-no-axes-column-increasing"></i>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="brand-block">
+            <div class="brand-mark" aria-hidden="true">
+              <i data-lucide="landmark"></i>
+            </div>
+            <div>
+              <p class="eyebrow">Investimentos e bens</p>
+              <h1>Patrimonio</h1>
+            </div>
+          </div>
+
+          <div class="top-actions">
+            <button class="compact-button" id="backupDatabase">
+              <i data-lucide="database"></i>
+              Backup
+            </button>
+            <a class="text-button" href="./index.html">
+              <i data-lucide="calendar-check"></i>
+              Planner
+            </a>
+          </div>
+        </header>
+
+        <section class="summary-grid" id="patrimonySummary" aria-label="Resumo do patrimonio"></section>
+
+        <section class="focus-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Carteira</p>
+                <h3>Patrimonio por tipo</h3>
+              </div>
+              <button class="icon-button" id="openAssetForm" title="Novo item" aria-label="Novo item">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+            <div class="category-map" id="assetTypeMap"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Liquidez</p>
+                <h3>Disponibilidade</h3>
+              </div>
+            </div>
+            <div class="category-map" id="liquidityMap"></div>
+          </section>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Registros</p>
+              <h3>Investimentos e patrimonio</h3>
+            </div>
+            <button class="compact-button" id="openAssetFormSecondary">
+              <i data-lucide="plus"></i>
+              Novo item
+            </button>
+          </div>
+          <div class="bill-list dense" id="assetList"></div>
+        </section>
+      </main>
+
+      <button class="fab" id="openAssetFormFloating">
+        <i data-lucide="plus"></i>
+        Novo item
+      </button>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <dialog class="modal" id="assetDialog">
+      <form class="modal-body" id="assetForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Patrimonio</p>
+            <h2 id="assetDialogTitle">Novo item</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="assetDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="assetId" />
+
+        <label class="field">
+          <span>Nome</span>
+          <input id="assetName" type="text" placeholder="Tesouro Selic" required />
+        </label>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Tipo</span>
+            <select id="assetType" required>
+              <option value="Investimento">Investimento</option>
+              <option value="Reserva">Reserva</option>
+              <option value="Imovel">Imovel</option>
+              <option value="Veiculo">Veiculo</option>
+              <option value="Conta">Conta</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Instituicao</span>
+            <input id="assetInstitution" type="text" placeholder="Banco, corretora ou bem" />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Valor atual</span>
+            <input id="assetCurrentValue" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Valor investido</span>
+            <input id="assetInvestedValue" type="number" min="0" step="0.01" />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Data de referencia</span>
+            <input id="assetReferenceDate" type="date" required />
+          </label>
+          <label class="field">
+            <span>Liquidez</span>
+            <select id="assetLiquidity" required>
+              <option value="D0">D0</option>
+              <option value="D1">D1</option>
+              <option value="Ate 30 dias">Ate 30 dias</option>
+              <option value="Longo prazo">Longo prazo</option>
+              <option value="Nao liquido">Nao liquido</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Responsavel</span>
+          <select id="assetOwner">
+            <option value="Andre">Andre</option>
+            <option value="Luciana">Luciana</option>
+            <option value="Ambos">Ambos</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Observacao</span>
+          <textarea id="assetNotes" rows="3" placeholder="Opcional"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="assetDialog">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Salvar item
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./patrimonio.js"></script>
+  </body>
+</html>

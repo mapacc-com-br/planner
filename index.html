@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Planner financeiro</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacao principal">
+        <div class="sidebar-mark" aria-hidden="true">
+          <i data-lucide="calendar-check"></i>
+        </div>
+        <nav class="sidebar-nav">
+          <button class="sidebar-button is-active" title="Hoje" aria-label="Hoje">
+            <i data-lucide="home"></i>
+          </button>
+          <a class="sidebar-button" href="./patrimonio.html" title="Patrimonio" aria-label="Patrimonio">
+            <i data-lucide="landmark"></i>
+          </a>
+          <button class="sidebar-button" title="Contas" aria-label="Contas">
+            <i data-lucide="receipt-text"></i>
+          </button>
+          <button class="sidebar-button" title="Receitas" aria-label="Receitas">
+            <i data-lucide="wallet-cards"></i>
+          </button>
+          <button class="sidebar-button" title="Relatorios" aria-label="Relatorios">
+            <i data-lucide="chart-no-axes-column-increasing"></i>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="brand-block">
+            <div class="brand-mark" aria-hidden="true">
+              <i data-lucide="calendar-check"></i>
+            </div>
+            <div>
+              <p class="eyebrow">Agenda compartilhada</p>
+              <h1>Planner financeiro</h1>
+            </div>
+          </div>
+
+          <div class="top-actions">
+            <button class="compact-button recovery-button" id="recoverLocalStorage" hidden>
+              <i data-lucide="history"></i>
+              Recuperar local
+            </button>
+            <button class="compact-button" id="backupDatabase">
+              <i data-lucide="database"></i>
+              Backup
+            </button>
+            <div class="actor-switch" aria-label="Usuario ativo">
+              <button class="actor-button is-active" data-actor="Andre">Andre</button>
+              <button class="actor-button" data-actor="Luciana">Luciana</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="month-strip" aria-label="Selecionar mes">
+          <div>
+            <p class="eyebrow">Mapa financeiro do mes</p>
+            <h2 id="monthLabel">Julho de 2026</h2>
+          </div>
+          <div class="month-actions">
+            <button class="icon-button" id="previousMonth" title="Mes anterior" aria-label="Mes anterior">
+              <i data-lucide="chevron-left"></i>
+            </button>
+            <button class="text-button" id="currentMonth">Hoje</button>
+            <button class="icon-button" id="nextMonth" title="Proximo mes" aria-label="Proximo mes">
+              <i data-lucide="chevron-right"></i>
+            </button>
+          </div>
+        </section>
+
+        <section class="summary-grid" id="summaryGrid" aria-label="Resumo financeiro"></section>
+
+        <section class="focus-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Prioridade</p>
+                <h3>Para pagar agora</h3>
+              </div>
+              <span class="count-pill" id="urgentCount">0</span>
+            </div>
+            <div class="bill-list" id="urgentList"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Categorias</p>
+                <h3>Visao do mes</h3>
+              </div>
+              <button class="icon-button" id="openRevenueForm" title="Nova receita" aria-label="Nova receita">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+            <div class="category-map" id="categoryMap"></div>
+          </section>
+        </section>
+
+        <section class="ledger-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Contas</p>
+                <h3>Movimentos do mes</h3>
+              </div>
+              <button class="compact-button" id="openBillForm">
+                <i data-lucide="plus"></i>
+                Nova conta
+              </button>
+            </div>
+            <div class="bill-list dense" id="allBillsList"></div>
+          </section>
+
+          <section class="side-stack">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Pagamentos</p>
+                  <h3>Ja pagas</h3>
+                </div>
+                <span class="count-pill positive" id="paidCount">0</span>
+              </div>
+              <div class="bill-list compact" id="paidList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Entradas</p>
+                  <h3>Receitas</h3>
+                </div>
+                <button class="icon-button" id="openRevenueFormSecondary" title="Nova receita" aria-label="Nova receita">
+                  <i data-lucide="plus"></i>
+                </button>
+              </div>
+              <div class="revenue-list" id="revenueList"></div>
+            </section>
+          </section>
+        </section>
+      </main>
+
+      <button class="fab" id="openBillFormFloating">
+        <i data-lucide="plus"></i>
+        Nova conta
+      </button>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <dialog class="modal" id="billDialog">
+      <form class="modal-body" id="billForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Conta</p>
+            <h2 id="billDialogTitle">Nova conta</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="billDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="billId" />
+
+        <label class="field">
+          <span>Nome</span>
+          <input id="billName" name="billName" type="text" placeholder="Aluguel" required />
+        </label>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Valor previsto</span>
+            <input id="billAmount" name="billAmount" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Vencimento</span>
+            <input id="billDueDate" name="billDueDate" type="date" required />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Categoria</span>
+            <select id="billCategory" name="billCategory" required></select>
+          </label>
+          <label class="field">
+            <span>Responsavel</span>
+            <select id="billOwner" name="billOwner">
+              <option value="Andre">Andre</option>
+              <option value="Luciana">Luciana</option>
+              <option value="Ambos">Ambos</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Recorrencia</span>
+            <select id="billRecurrence" name="billRecurrence">
+              <option value="Unica">Unica</option>
+              <option value="Mensal">Mensal</option>
+              <option value="Anual">Anual</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Status inicial</span>
+            <select id="billInitialStatus" name="billInitialStatus">
+              <option value="pending">Pendente</option>
+              <option value="paid">Paga</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Observacao</span>
+          <textarea id="billNotes" name="billNotes" rows="3" placeholder="Opcional"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="billDialog">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Salvar conta
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="paymentDialog">
+      <form class="modal-body" id="paymentForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Pagamento</p>
+            <h2>Marcar como pago</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="paymentDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="paymentBillId" />
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Valor pago</span>
+            <input id="paymentAmount" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Data</span>
+            <input id="paymentDate" type="date" required />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Pago por</span>
+            <select id="paymentBy">
+              <option value="Andre">Andre</option>
+              <option value="Luciana">Luciana</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Metodo</span>
+            <select id="paymentMethod">
+              <option value="Pix">Pix</option>
+              <option value="Debito">Debito</option>
+              <option value="Credito">Credito</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Transferencia">Transferencia</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Observacao</span>
+          <textarea id="paymentNotes" rows="3" placeholder="Opcional"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="paymentDialog">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="check"></i>
+            Confirmar pagamento
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="revenueDialog">
+      <form class="modal-body" id="revenueForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Receita</p>
+            <h2 id="revenueDialogTitle">Nova receita</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="revenueDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="revenueId" />
+
+        <label class="field">
+          <span>Nome</span>
+          <input id="revenueName" type="text" placeholder="Salario" required />
+        </label>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Valor</span>
+            <input id="revenueAmount" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Data</span>
+            <input id="revenueDate" type="date" required />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Responsavel</span>
+          <select id="revenueOwner">
+            <option value="Andre">Andre</option>
+            <option value="Luciana">Luciana</option>
+            <option value="Ambos">Ambos</option>
+          </select>
+        </label>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="revenueDialog">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Salvar receita
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
