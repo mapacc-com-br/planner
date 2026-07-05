@@ -1,4 +1,5 @@
 data/
+auth.local.json
 *.log
 server*.log
 node_modules/

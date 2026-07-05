@@ -100,3 +100,22 @@ Passos:
 6. Gerar um dominio publico no servico.
 
 Sem volume, o deploy funciona, mas os dados podem ser perdidos entre redeploys.
+
+## Login
+
+O app pode ser protegido com `PLANNER_AUTH_CONFIG`, um JSON com usuarios e hashes de senha. Para desenvolvimento local, tambem e possivel criar `auth.local.json`, que fica fora do Git.
+
+Formato:
+
+```json
+{
+  "users": [
+    {
+      "username": "andre",
+      "name": "Andre",
+      "actor": "Andre",
+      "passwordHash": "pbkdf2-sha256$100000$salt$hash"
+    }
+  ]
+}
+```

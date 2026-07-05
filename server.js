@@ -10,6 +10,10 @@ const backupDir = path.join(dataDir, "backups");
 const dbPath = path.join(dataDir, "planner-financeiro.sqlite");
 const port = Number(process.env.PORT || process.argv[2] || 80);
 const host = process.env.RAILWAY_ENVIRONMENT_ID ? "0.0.0.0" : process.env.HOST || "127.0.0.1";
+const sessionCookieName = "planner_session";
+const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
+const authConfig = loadAuthConfig();
+const sessions = new Map();
 
 fs.mkdirSync(dataDir, { recursive: true });
 fs.mkdirSync(backupDir, { recursive: true });
@@ -32,6 +36,31 @@ const mimeTypes = {
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url, `http://${request.headers.host || "localhost"}`);
+
+    if (url.pathname === "/api/login" && request.method === "POST") {
+      await handleLogin(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/logout" && request.method === "POST") {
+      handleLogout(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/session" && request.method === "GET") {
+      sendJson(response, 200, getSessionResponse(request));
+      return;
+    }
+
+    if (authConfig && !isPublicPath(url.pathname) && !getCurrentUser(request)) {
+      if (url.pathname.startsWith("/api/")) {
+        sendJson(response, 401, { error: "Sessao expirada. Entre novamente." });
+        return;
+      }
+
+      redirectToLogin(response, url);
+      return;
+    }
 
     if (url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
@@ -145,6 +174,55 @@ async function handleApi(request, response, url) {
   }
 
   sendJson(response, 404, { error: "Rota nao encontrada." });
+}
+
+async function handleLogin(request, response) {
+  if (!authConfig) {
+    sendJson(response, 200, { ok: true, user: null });
+    return;
+  }
+
+  const body = await readJson(request);
+  const username = String(body.username || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  const user = authConfig.users.find((item) => item.username.toLowerCase() === username);
+
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    sendJson(response, 401, { error: "Usuario ou senha invalidos." });
+    return;
+  }
+
+  const token = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = Date.now() + sessionDurationMs;
+  sessions.set(token, { username: user.username, name: user.name, actor: user.actor, expiresAt });
+
+  response.writeHead(200, {
+    "cache-control": "no-store",
+    "content-type": "application/json; charset=utf-8",
+    "set-cookie": serializeSessionCookie(request, token, Math.floor(sessionDurationMs / 1000)),
+  });
+  response.end(JSON.stringify({ ok: true, user: { username: user.username, name: user.name, actor: user.actor } }));
+}
+
+function handleLogout(request, response) {
+  const token = parseCookies(request.headers.cookie || "")[sessionCookieName];
+  if (token) sessions.delete(token);
+
+  response.writeHead(200, {
+    "cache-control": "no-store",
+    "content-type": "application/json; charset=utf-8",
+    "set-cookie": serializeSessionCookie(request, "", 0),
+  });
+  response.end(JSON.stringify({ ok: true }));
+}
+
+function getSessionResponse(request) {
+  const user = getCurrentUser(request);
+  return {
+    authenticated: Boolean(user) || !authConfig,
+    user: user ? { username: user.username, name: user.name, actor: user.actor } : null,
+    authRequired: Boolean(authConfig),
+  };
 }
 
 function initializeDatabase() {
@@ -685,6 +763,100 @@ function sendJson(response, statusCode, payload) {
     "content-type": "application/json; charset=utf-8",
   });
   response.end(JSON.stringify(payload));
+}
+
+function loadAuthConfig() {
+  const raw = process.env.PLANNER_AUTH_CONFIG || readLocalAuthConfig();
+  if (!raw) return null;
+
+  const config = JSON.parse(raw);
+  if (!Array.isArray(config.users) || !config.users.length) {
+    throw new Error("PLANNER_AUTH_CONFIG precisa conter usuarios.");
+  }
+
+  return {
+    users: config.users.map((user) => ({
+      username: cleanText(user.username, "username"),
+      name: cleanText(user.name || user.username, "name"),
+      actor: cleanText(user.actor || user.name || user.username, "actor"),
+      passwordHash: cleanText(user.passwordHash, "passwordHash"),
+    })),
+  };
+}
+
+function readLocalAuthConfig() {
+  const filePath = path.join(root, "auth.local.json");
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
+}
+
+function verifyPassword(password, passwordHash) {
+  const [scheme, iterationsRaw, salt, expected] = passwordHash.split("$");
+  if (scheme !== "pbkdf2-sha256") return false;
+
+  const iterations = Number(iterationsRaw);
+  if (!Number.isInteger(iterations) || iterations < 100000) return false;
+
+  const actual = crypto.pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("base64url");
+  return timingSafeEqual(actual, expected);
+}
+
+function timingSafeEqual(actual, expected) {
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function getCurrentUser(request) {
+  const token = parseCookies(request.headers.cookie || "")[sessionCookieName];
+  if (!token) return null;
+
+  const session = sessions.get(token);
+  if (!session) return null;
+
+  if (session.expiresAt <= Date.now()) {
+    sessions.delete(token);
+    return null;
+  }
+
+  return session;
+}
+
+function parseCookies(header) {
+  return header.split(";").reduce((cookies, entry) => {
+    const index = entry.indexOf("=");
+    if (index === -1) return cookies;
+    const key = entry.slice(0, index).trim();
+    const value = entry.slice(index + 1).trim();
+    cookies[key] = decodeURIComponent(value);
+    return cookies;
+  }, {});
+}
+
+function serializeSessionCookie(request, token, maxAgeSeconds) {
+  const secure = process.env.RAILWAY_ENVIRONMENT_ID || request.headers["x-forwarded-proto"] === "https";
+  return [
+    `${sessionCookieName}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${maxAgeSeconds}`,
+    secure ? "Secure" : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
+function isPublicPath(pathname) {
+  return ["/login.html", "/login.js", "/styles.css", "/favicon.ico"].includes(pathname);
+}
+
+function redirectToLogin(response, url) {
+  const next = encodeURIComponent(`${url.pathname}${url.search}`);
+  response.writeHead(302, {
+    "cache-control": "no-store",
+    location: `/login.html?next=${next}`,
+  });
+  response.end();
 }
 
 function toCents(value) {

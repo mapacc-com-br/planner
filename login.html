@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entrar - Planner financeiro</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="login-page">
+      <section class="login-panel">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">
+            <i data-lucide="calendar-check"></i>
+          </div>
+          <div>
+            <p class="eyebrow">Agenda compartilhada</p>
+            <h1>Planner financeiro</h1>
+          </div>
+        </div>
+
+        <form class="login-form" id="loginForm">
+          <label class="field">
+            <span>Usuario</span>
+            <input id="username" name="username" autocomplete="username" required />
+          </label>
+
+          <label class="field">
+            <span>Senha</span>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+          </label>
+
+          <button class="primary-button" type="submit">
+            <i data-lucide="log-in"></i>
+            Entrar
+          </button>
+        </form>
+
+        <p class="patrimony-note" id="loginMessage" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./login.js"></script>
+  </body>
+</html>

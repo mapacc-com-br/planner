@@ -30,6 +30,7 @@ const elements = {
   assetForm: document.querySelector("#assetForm"),
   assetDialogTitle: document.querySelector("#assetDialogTitle"),
   toast: document.querySelector("#toast"),
+  logoutButton: document.querySelector("#logoutButton"),
 };
 
 initialize();
@@ -52,6 +53,7 @@ function bindEvents() {
   });
 
   document.querySelector("#backupDatabase").addEventListener("click", () => backupDatabase());
+  elements.logoutButton.addEventListener("click", () => logout());
 
   document.querySelectorAll("[data-close-dialog]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -293,6 +295,11 @@ async function backupDatabase() {
   }
 }
 
+async function logout() {
+  await apiRequest("/api/logout", { method: "POST" });
+  window.location.href = "/login.html";
+}
+
 async function apiRequest(path, options = {}) {
   const response = await fetch(path, {
     method: options.method || "GET",
@@ -301,6 +308,11 @@ async function apiRequest(path, options = {}) {
   });
 
   const payload = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    window.location.href = `/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+    throw new Error(payload.error || "Sessao expirada.");
+  }
+
   if (!response.ok) {
     throw new Error(payload.error || payload.details || "Erro ao acessar o banco de dados.");
   }

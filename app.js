@@ -41,6 +41,7 @@ let bills = [];
 let revenues = [];
 let selectedMonth = localStorage.getItem(STORAGE_KEYS.selectedMonth) || monthKey(new Date());
 let currentActor = localStorage.getItem(STORAGE_KEYS.actor) || "Andre";
+let lockedActor = null;
 let toastTimer = null;
 let pendingLocalRecovery = null;
 
@@ -64,6 +65,7 @@ const elements = {
   revenueDialogTitle: document.querySelector("#revenueDialogTitle"),
   toast: document.querySelector("#toast"),
   recoverLocalStorage: document.querySelector("#recoverLocalStorage"),
+  logoutButton: document.querySelector("#logoutButton"),
 };
 
 initializeApp();
@@ -86,6 +88,7 @@ function bindEvents() {
   document.querySelector("#nextMonth").addEventListener("click", () => shiftMonth(1));
   document.querySelector("#currentMonth").addEventListener("click", () => setSelectedMonth(monthKey(new Date())));
   document.querySelector("#backupDatabase").addEventListener("click", () => backupDatabase());
+  elements.logoutButton.addEventListener("click", () => logout());
   document.querySelector("#recoverLocalStorage").addEventListener("click", () => recoverLocalSnapshot());
 
   document.querySelectorAll("#openBillForm, #openBillFormFloating").forEach((button) => {
@@ -105,6 +108,7 @@ function bindEvents() {
 
   document.querySelectorAll("[data-actor]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (lockedActor && button.dataset.actor !== lockedActor) return;
       currentActor = button.dataset.actor;
       localStorage.setItem(STORAGE_KEYS.actor, currentActor);
       render();
@@ -136,6 +140,7 @@ function bindEvents() {
 }
 
 async function loadInitialState() {
+  await syncSessionActor();
   const state = await apiRequest("/api/state");
   const hasDatabaseData = state.bills.length || state.revenues.length;
   const localSnapshot = {
@@ -170,6 +175,15 @@ async function loadInitialState() {
 
   applyState(imported);
   saveLocalSnapshot();
+}
+
+async function syncSessionActor() {
+  const session = await apiRequest("/api/session");
+  if (!session.user?.actor) return;
+
+  lockedActor = session.user.actor;
+  currentActor = lockedActor;
+  localStorage.setItem(STORAGE_KEYS.actor, currentActor);
 }
 
 async function refreshState() {
@@ -244,7 +258,13 @@ function render() {
 function renderActorSwitch() {
   document.querySelectorAll("[data-actor]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.actor === currentActor);
+    button.disabled = Boolean(lockedActor && button.dataset.actor !== lockedActor);
   });
+}
+
+async function logout() {
+  await apiRequest("/api/logout", { method: "POST" });
+  window.location.href = "/login.html";
 }
 
 function renderSummary() {
@@ -651,6 +671,11 @@ async function apiRequest(path, options = {}) {
   });
 
   const payload = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    window.location.href = `/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+    throw new Error(payload.error || "Sessao expirada.");
+  }
+
   if (!response.ok) {
     throw new Error(payload.error || payload.details || "Erro ao acessar o banco de dados.");
   }
