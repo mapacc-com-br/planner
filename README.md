@@ -59,6 +59,8 @@ Tabelas principais:
 - `bills`
 - `revenues`
 - `assets`
+- `card_statements`
+- `card_transactions`
 
 Backups consistentes sao criados pelo botao **Backup**:
 

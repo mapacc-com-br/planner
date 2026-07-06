@@ -92,6 +92,8 @@ async function handleApi(request, response, url) {
       bills: db.prepare("select count(*) as count from bills").get().count,
       revenues: db.prepare("select count(*) as count from revenues").get().count,
       assets: db.prepare("select count(*) as count from assets").get().count,
+      cardStatements: db.prepare("select count(*) as count from card_statements").get().count,
+      cardTransactions: db.prepare("select count(*) as count from card_transactions").get().count,
     });
     return;
   }
@@ -157,6 +159,24 @@ async function handleApi(request, response, url) {
 
   if (method === "DELETE" && parts[1] === "assets" && parts[2]) {
     db.prepare("delete from assets where id = ?").run(parts[2]);
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (method === "GET" && url.pathname === "/api/card-statements") {
+    sendJson(response, 200, getCardStatementsState());
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/api/card-statements") {
+    const statement = normalizeCardStatement(await readJson(request));
+    saveCardStatement(statement);
+    sendJson(response, 200, { statement: getCardStatement(statement.id) });
+    return;
+  }
+
+  if (method === "DELETE" && parts[1] === "card-statements" && parts[2]) {
+    db.prepare("delete from card_statements where id = ?").run(parts[2]);
     sendJson(response, 200, { ok: true });
     return;
   }
@@ -317,6 +337,35 @@ function initializeDatabase() {
     create index if not exists idx_assets_type on assets(asset_type);
     create index if not exists idx_assets_value on assets(current_value_cents);
 
+    create table if not exists card_statements (
+      id text primary key,
+      workspace_id text not null default 'home' references workspaces(id) on delete cascade,
+      label text not null check (length(trim(label)) > 0),
+      card_name text not null check (length(trim(card_name)) > 0),
+      closing_date text check (closing_date is null or closing_date glob '????-??-??'),
+      due_date text check (due_date is null or due_date glob '????-??-??'),
+      imported_by text not null check (imported_by in ('Andre', 'Luciana')),
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now'))
+    );
+
+    create table if not exists card_transactions (
+      id text primary key,
+      statement_id text not null references card_statements(id) on delete cascade,
+      purchase_date text not null check (purchase_date glob '????-??-??'),
+      description text not null check (length(trim(description)) > 0),
+      category text not null check (length(trim(category)) > 0),
+      amount_cents integer not null,
+      installments text not null default '',
+      owner text not null check (owner in ('Andre', 'Luciana', 'Ambos')),
+      notes text not null default '',
+      created_at text not null default (datetime('now'))
+    );
+
+    create index if not exists idx_card_transactions_statement on card_transactions(statement_id);
+    create index if not exists idx_card_transactions_date on card_transactions(purchase_date);
+    create index if not exists idx_card_transactions_category on card_transactions(category);
+
     create trigger if not exists bills_updated_at
     after update on bills
     for each row
@@ -339,6 +388,14 @@ function initializeDatabase() {
     when old.updated_at = new.updated_at
     begin
       update assets set updated_at = datetime('now') where id = new.id;
+    end;
+
+    create trigger if not exists card_statements_updated_at
+    after update on card_statements
+    for each row
+    when old.updated_at = new.updated_at
+    begin
+      update card_statements set updated_at = datetime('now') where id = new.id;
     end;
   `);
 
@@ -389,6 +446,12 @@ function getPatrimonyState() {
       )
       .all()
       .map(rowToAsset),
+  };
+}
+
+function getCardStatementsState() {
+  return {
+    statements: getCardStatements(),
   };
 }
 
@@ -527,6 +590,80 @@ function upsertAsset(asset) {
   );
 }
 
+function saveCardStatement(statement) {
+  transaction(() => {
+    db.prepare(
+      `insert into card_statements (id, workspace_id, label, card_name, closing_date, due_date, imported_by)
+       values (?, 'home', ?, ?, ?, ?, ?)
+       on conflict(id) do update set
+         label = excluded.label,
+         card_name = excluded.card_name,
+         closing_date = excluded.closing_date,
+         due_date = excluded.due_date,
+         imported_by = excluded.imported_by`,
+    ).run(statement.id, statement.label, statement.cardName, statement.closingDate, statement.dueDate, statement.importedBy);
+
+    db.prepare("delete from card_transactions where statement_id = ?").run(statement.id);
+
+    const transactionStmt = db.prepare(
+      `insert into card_transactions (
+        id, statement_id, purchase_date, description, category, amount_cents, installments, owner, notes
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    statement.transactions.forEach((item) => {
+      transactionStmt.run(
+        item.id,
+        statement.id,
+        item.purchaseDate,
+        item.description,
+        item.category,
+        toCents(item.amount),
+        item.installments,
+        item.owner,
+        item.notes,
+      );
+    });
+  });
+}
+
+function getCardStatements() {
+  const statements = db
+    .prepare(
+      `select id, label, card_name, closing_date, due_date, imported_by, created_at, updated_at
+         from card_statements
+        order by coalesce(due_date, closing_date, created_at) desc, created_at desc`,
+    )
+    .all()
+    .map(rowToCardStatement);
+
+  if (!statements.length) return [];
+
+  const transactions = db
+    .prepare(
+      `select id, statement_id, purchase_date, description, category, amount_cents, installments, owner, notes
+         from card_transactions
+        order by purchase_date asc, description asc`,
+    )
+    .all()
+    .map(rowToCardTransaction);
+
+  const grouped = transactions.reduce((map, item) => {
+    if (!map.has(item.statementId)) map.set(item.statementId, []);
+    map.get(item.statementId).push(item);
+    return map;
+  }, new Map());
+
+  return statements.map((statement) => ({
+    ...statement,
+    transactions: grouped.get(statement.id) || [],
+  }));
+}
+
+function getCardStatement(id) {
+  return getCardStatements().find((statement) => statement.id === id) || null;
+}
+
 function getBill(id) {
   const row = db
     .prepare(
@@ -645,6 +782,47 @@ function normalizeAsset(raw) {
   };
 }
 
+function normalizeCardStatement(raw) {
+  const transactions = Array.isArray(raw.transactions) ? raw.transactions : [];
+  const importedBy = raw.importedBy || "Andre";
+  const closingDate = optionalDate(raw.closingDate, "closingDate");
+  const dueDate = optionalDate(raw.dueDate, "dueDate");
+
+  assertChoice(importedBy, ["Andre", "Luciana"], "importedBy");
+  if (!transactions.length) throw new Error("Inclua ao menos uma transacao do cartao.");
+
+  return {
+    id: raw.id || crypto.randomUUID(),
+    label: cleanText(raw.label, "label"),
+    cardName: cleanText(raw.cardName || "Cartao", "cardName"),
+    closingDate,
+    dueDate,
+    importedBy,
+    transactions: transactions.map(normalizeCardTransaction),
+  };
+}
+
+function normalizeCardTransaction(raw) {
+  const amount = Number(raw.amount);
+  const purchaseDate = String(raw.purchaseDate || raw.date || "");
+  const owner = raw.owner || "Ambos";
+
+  if (!Number.isFinite(amount)) throw new Error("Valor de transacao invalido.");
+  assertDate(purchaseDate, "purchaseDate");
+  assertChoice(owner, ["Andre", "Luciana", "Ambos"], "owner");
+
+  return {
+    id: raw.id || crypto.randomUUID(),
+    purchaseDate,
+    description: cleanText(raw.description || raw.name, "description"),
+    category: cleanText(raw.category || "Sem categoria", "category"),
+    amount,
+    installments: String(raw.installments || "").trim(),
+    owner,
+    notes: String(raw.notes || "").trim(),
+  };
+}
+
 function rowToBill(row) {
   return {
     id: row.id,
@@ -686,6 +864,34 @@ function rowToAsset(row) {
     investedValue: row.invested_value_cents == null ? null : fromCents(row.invested_value_cents),
     referenceDate: row.reference_date,
     liquidity: row.liquidity,
+    owner: row.owner,
+    notes: row.notes,
+  };
+}
+
+function rowToCardStatement(row) {
+  return {
+    id: row.id,
+    label: row.label,
+    cardName: row.card_name,
+    closingDate: row.closing_date,
+    dueDate: row.due_date,
+    importedBy: row.imported_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    transactions: [],
+  };
+}
+
+function rowToCardTransaction(row) {
+  return {
+    id: row.id,
+    statementId: row.statement_id,
+    purchaseDate: row.purchase_date,
+    description: row.description,
+    category: row.category,
+    amount: fromCents(row.amount_cents),
+    installments: row.installments,
     owner: row.owner,
     notes: row.notes,
   };
@@ -887,6 +1093,13 @@ function assertDate(value, field) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error(`Data invalida para ${field}.`);
   }
+}
+
+function optionalDate(value, field) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  assertDate(text, field);
+  return text;
 }
 
 function getDefaultCategories() {

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cartao</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacao principal">
+        <div class="sidebar-mark" aria-hidden="true">
+          <i data-lucide="calendar-check"></i>
+        </div>
+        <nav class="sidebar-nav">
+          <a class="sidebar-button" href="./index.html" title="Planner financeiro" aria-label="Planner financeiro">
+            <i data-lucide="home"></i>
+          </a>
+          <a class="sidebar-button" href="./patrimonio.html" title="Patrimonio" aria-label="Patrimonio">
+            <i data-lucide="landmark"></i>
+          </a>
+          <a class="sidebar-button is-active" href="./cartao.html" title="Cartao" aria-label="Cartao">
+            <i data-lucide="credit-card"></i>
+          </a>
+          <button class="sidebar-button" title="Contas" aria-label="Contas">
+            <i data-lucide="receipt-text"></i>
+          </button>
+          <button class="sidebar-button" title="Receitas" aria-label="Receitas">
+            <i data-lucide="wallet-cards"></i>
+          </button>
+          <button class="sidebar-button" title="Relatorios" aria-label="Relatorios">
+            <i data-lucide="chart-no-axes-column-increasing"></i>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="brand-block">
+            <div class="brand-mark" aria-hidden="true">
+              <i data-lucide="credit-card"></i>
+            </div>
+            <div>
+              <p class="eyebrow">Fatura inteligente</p>
+              <h1>Cartao</h1>
+            </div>
+          </div>
+
+          <div class="top-actions">
+            <button class="compact-button" id="backupDatabase">
+              <i data-lucide="database"></i>
+              Backup
+            </button>
+            <button class="compact-button" id="logoutButton">
+              <i data-lucide="log-out"></i>
+              Sair
+            </button>
+            <a class="text-button" href="./index.html">
+              <i data-lucide="calendar-check"></i>
+              Planner
+            </a>
+          </div>
+        </header>
+
+        <section class="month-strip card-strip" aria-label="Resumo do cartao">
+          <div>
+            <p class="eyebrow">BI domestico do cartao</p>
+            <h2 id="statementTitle">Nenhuma fatura importada</h2>
+          </div>
+          <div class="statement-tools">
+            <select id="statementSelect" aria-label="Selecionar fatura"></select>
+            <button class="icon-button" id="deleteStatement" title="Excluir fatura" aria-label="Excluir fatura">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+        </section>
+
+        <section class="summary-grid" id="cardSummary" aria-label="Resumo da fatura"></section>
+
+        <section class="focus-grid card-workspace">
+          <section class="panel import-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Entrada</p>
+                <h3>Colar fatura estruturada</h3>
+              </div>
+              <span class="count-pill" id="previewCount">0 linhas</span>
+            </div>
+
+            <form class="statement-form" id="statementForm">
+              <div class="form-grid">
+                <label class="field">
+                  <span>Nome da fatura</span>
+                  <input id="statementLabel" required />
+                </label>
+                <label class="field">
+                  <span>Cartao</span>
+                  <input id="cardName" value="Cartao principal" required />
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <label class="field">
+                  <span>Fechamento</span>
+                  <input id="closingDate" type="date" />
+                </label>
+                <label class="field">
+                  <span>Vencimento</span>
+                  <input id="dueDate" type="date" />
+                </label>
+              </div>
+
+              <label class="field wide-field">
+                <span>Linhas da fatura</span>
+                <textarea id="statementPaste" rows="11" placeholder="Data | Descricao | Categoria | Valor | Parcelas | Responsavel | Observacao"></textarea>
+              </label>
+
+              <div class="modal-actions">
+                <button class="ghost-button" id="previewStatement" type="button">
+                  <i data-lucide="sparkles"></i>
+                  Pre-visualizar
+                </button>
+                <button class="primary-button" type="submit">
+                  <i data-lucide="save"></i>
+                  Salvar fatura
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Leitura</p>
+                <h3>O que chama atencao</h3>
+              </div>
+            </div>
+            <div class="insight-list" id="cardInsights"></div>
+          </section>
+        </section>
+
+        <section class="ledger-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Extrato</p>
+                <h3>Gastos da fatura</h3>
+              </div>
+              <div class="filter-bar">
+                <input id="transactionSearch" type="search" placeholder="Buscar" aria-label="Buscar gasto" />
+                <select id="categoryFilter" aria-label="Filtrar categoria"></select>
+              </div>
+            </div>
+            <div class="transaction-list" id="transactionList"></div>
+          </section>
+
+          <section class="side-stack">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Categorias</p>
+                  <h3>Onde pesou</h3>
+                </div>
+              </div>
+              <div class="category-map" id="cardCategoryMap"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Estabelecimentos</p>
+                  <h3>Maiores recorrencias</h3>
+                </div>
+              </div>
+              <div class="category-map" id="merchantMap"></div>
+            </section>
+          </section>
+        </section>
+      </main>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./cartao.js"></script>
+  </body>
+</html>
