@@ -930,6 +930,67 @@ h3 {
   line-height: 1.45;
 }
 
+.scope-modal {
+  width: min(560px, calc(100vw - 24px));
+}
+
+.scope-copy {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7fbff;
+}
+
+.scope-copy strong {
+  color: var(--text);
+}
+
+.scope-options {
+  display: grid;
+  gap: 10px;
+}
+
+.scope-button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 13px 14px;
+  color: var(--text);
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.scope-button:hover,
+.scope-button:focus-visible {
+  border-color: #9fc7eb;
+  background: #f2f8ff;
+}
+
+.scope-button strong {
+  font-size: 0.98rem;
+}
+
+.scope-button span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.scope-button.danger {
+  border-color: rgba(191, 91, 100, 0.32);
+}
+
+.scope-button.danger:hover,
+.scope-button.danger:focus-visible {
+  border-color: rgba(191, 91, 100, 0.58);
+  background: #fff6f7;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus,

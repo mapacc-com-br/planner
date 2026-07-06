@@ -90,6 +90,7 @@ async function handleApi(request, response, url) {
       ok: true,
       database: dbPath,
       bills: db.prepare("select count(*) as count from bills").get().count,
+      billOccurrences: db.prepare("select count(*) as count from bill_occurrences").get().count,
       revenues: db.prepare("select count(*) as count from revenues").get().count,
       assets: db.prepare("select count(*) as count from assets").get().count,
       cardStatements: db.prepare("select count(*) as count from card_statements").get().count,
@@ -110,24 +111,60 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (method === "POST" && url.pathname === "/api/bill-occurrences") {
+    const occurrence = normalizeBillOccurrence(await readJson(request));
+    upsertBillOccurrence(occurrence);
+    sendJson(response, 200, { occurrence });
+    return;
+  }
+
+  if (method === "PATCH" && parts[1] === "bills" && parts[3] === "recurrence-end") {
+    const id = pathParam(parts[2]);
+    const body = await readJson(request);
+    endBillRecurrence(id, body.recurrenceUntil || null, body.updatedBy || "Andre");
+    sendJson(response, 200, { bill: getBill(id) });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/api/recurring-bills/split") {
+    const body = await readJson(request);
+    const bill = splitRecurringBill(body.parentId, body.competence, normalizeBill(body.bill));
+    sendJson(response, 200, { bill });
+    return;
+  }
+
   if (method === "PATCH" && parts[1] === "bills" && parts[3] === "payment") {
-    const id = parts[2];
+    const id = pathParam(parts[2]);
     const payment = normalizePayment(await readJson(request));
+    const occurrence = parseOccurrenceId(id);
+    if (occurrence) {
+      markBillOccurrencePaid(occurrence.parentId, occurrence.competence, payment);
+      sendJson(response, 200, { ok: true });
+      return;
+    }
+
     markBillPaid(id, payment);
     sendJson(response, 200, { bill: getBill(id) });
     return;
   }
 
   if (method === "PATCH" && parts[1] === "bills" && parts[3] === "unpay") {
-    const id = parts[2];
+    const id = pathParam(parts[2]);
     const body = await readJson(request);
+    const occurrence = parseOccurrenceId(id);
+    if (occurrence) {
+      undoBillOccurrencePayment(occurrence.parentId, occurrence.competence, body.updatedBy || "Andre");
+      sendJson(response, 200, { ok: true });
+      return;
+    }
+
     undoBillPayment(id, body.updatedBy || "Andre");
     sendJson(response, 200, { bill: getBill(id) });
     return;
   }
 
   if (method === "DELETE" && parts[1] === "bills" && parts[2]) {
-    db.prepare("delete from bills where id = ?").run(parts[2]);
+    db.prepare("delete from bills where id = ?").run(pathParam(parts[2]));
     sendJson(response, 200, { ok: true });
     return;
   }
@@ -140,7 +177,7 @@ async function handleApi(request, response, url) {
   }
 
   if (method === "DELETE" && parts[1] === "revenues" && parts[2]) {
-    db.prepare("delete from revenues where id = ?").run(parts[2]);
+    db.prepare("delete from revenues where id = ?").run(pathParam(parts[2]));
     sendJson(response, 200, { ok: true });
     return;
   }
@@ -158,7 +195,7 @@ async function handleApi(request, response, url) {
   }
 
   if (method === "DELETE" && parts[1] === "assets" && parts[2]) {
-    db.prepare("delete from assets where id = ?").run(parts[2]);
+    db.prepare("delete from assets where id = ?").run(pathParam(parts[2]));
     sendJson(response, 200, { ok: true });
     return;
   }
@@ -176,7 +213,7 @@ async function handleApi(request, response, url) {
   }
 
   if (method === "DELETE" && parts[1] === "card-statements" && parts[2]) {
-    db.prepare("delete from card_statements where id = ?").run(parts[2]);
+    db.prepare("delete from card_statements where id = ?").run(pathParam(parts[2]));
     sendJson(response, 200, { ok: true });
     return;
   }
@@ -285,6 +322,7 @@ function initializeDatabase() {
       category text not null references categories(name),
       owner text not null check (owner in ('Andre', 'Luciana', 'Ambos')),
       recurrence text not null check (recurrence in ('Unica', 'Mensal', 'Anual')),
+      recurrence_until text check (recurrence_until is null or recurrence_until glob '????-??-??'),
       notes text not null default '',
       paid integer not null default 0 check (paid in (0, 1)),
       paid_amount_cents integer check (paid_amount_cents is null or paid_amount_cents >= 0),
@@ -317,6 +355,35 @@ function initializeDatabase() {
     create index if not exists idx_bills_month on bills(due_date);
     create index if not exists idx_bills_paid on bills(paid);
     create index if not exists idx_revenues_month on revenues(date);
+
+    create table if not exists bill_occurrences (
+      parent_id text not null references bills(id) on delete cascade,
+      competence text not null check (competence glob '????-??'),
+      due_date text check (due_date is null or due_date glob '????-??-??'),
+      amount_cents integer check (amount_cents is null or amount_cents >= 0),
+      category text references categories(name),
+      owner text check (owner is null or owner in ('Andre', 'Luciana', 'Ambos')),
+      notes text,
+      paid integer not null default 0 check (paid in (0, 1)),
+      paid_amount_cents integer check (paid_amount_cents is null or paid_amount_cents >= 0),
+      paid_date text check (paid_date is null or paid_date glob '????-??-??'),
+      paid_by text check (paid_by is null or paid_by in ('Andre', 'Luciana')),
+      payment_method text,
+      payment_notes text,
+      updated_by text not null check (updated_by in ('Andre', 'Luciana')),
+      deleted integer not null default 0 check (deleted in (0, 1)),
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now')),
+      primary key (parent_id, competence),
+      check (
+        (paid = 0 and paid_amount_cents is null and paid_date is null and paid_by is null)
+        or
+        (paid = 1 and paid_amount_cents is not null and paid_date is not null and paid_by is not null)
+      )
+    );
+
+    create index if not exists idx_bill_occurrences_parent on bill_occurrences(parent_id);
+    create index if not exists idx_bill_occurrences_competence on bill_occurrences(competence);
 
     create table if not exists assets (
       id text primary key,
@@ -390,6 +457,14 @@ function initializeDatabase() {
       update assets set updated_at = datetime('now') where id = new.id;
     end;
 
+    create trigger if not exists bill_occurrences_updated_at
+    after update on bill_occurrences
+    for each row
+    when old.updated_at = new.updated_at
+    begin
+      update bill_occurrences set updated_at = datetime('now') where parent_id = new.parent_id and competence = new.competence;
+    end;
+
     create trigger if not exists card_statements_updated_at
     after update on card_statements
     for each row
@@ -398,6 +473,8 @@ function initializeDatabase() {
       update card_statements set updated_at = datetime('now') where id = new.id;
     end;
   `);
+
+  ensureColumn("bills", "recurrence_until", "text check (recurrence_until is null or recurrence_until glob '????-??-??')");
 
   transaction(() => {
     db.prepare("insert or ignore into users (id, name) values (?, ?)").run("andre", "Andre");
@@ -419,7 +496,7 @@ function getState() {
   return {
     bills: db
       .prepare(
-        `select id, name, amount_cents, due_date, category, owner, recurrence, notes,
+        `select id, name, amount_cents, due_date, category, owner, recurrence, recurrence_until, notes,
                 paid, paid_amount_cents, paid_date, paid_by, payment_method, payment_notes,
                 created_by, updated_by
            from bills
@@ -427,6 +504,16 @@ function getState() {
       )
       .all()
       .map(rowToBill),
+    billOccurrences: db
+      .prepare(
+        `select parent_id, competence, due_date, amount_cents, category, owner, notes,
+                paid, paid_amount_cents, paid_date, paid_by, payment_method, payment_notes,
+                updated_by, deleted
+           from bill_occurrences
+          order by competence asc, parent_id asc`,
+      )
+      .all()
+      .map(rowToBillOccurrence),
     revenues: db
       .prepare("select id, name, amount_cents, date, owner from revenues order by date asc, name asc")
       .all()
@@ -468,10 +555,10 @@ function importState(payload) {
 function upsertBill(bill) {
   db.prepare(
     `insert into bills (
-      id, workspace_id, name, amount_cents, due_date, category, owner, recurrence, notes,
+      id, workspace_id, name, amount_cents, due_date, category, owner, recurrence, recurrence_until, notes,
       paid, paid_amount_cents, paid_date, paid_by, payment_method, payment_notes,
       created_by, updated_by
-    ) values (?, 'home', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) values (?, 'home', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     on conflict(id) do update set
       name = excluded.name,
       amount_cents = excluded.amount_cents,
@@ -479,6 +566,7 @@ function upsertBill(bill) {
       category = excluded.category,
       owner = excluded.owner,
       recurrence = excluded.recurrence,
+      recurrence_until = excluded.recurrence_until,
       notes = excluded.notes,
       paid = excluded.paid,
       paid_amount_cents = excluded.paid_amount_cents,
@@ -495,6 +583,7 @@ function upsertBill(bill) {
     bill.category,
     bill.owner,
     bill.recurrence,
+    bill.recurrenceUntil,
     bill.notes,
     bill.paid ? 1 : 0,
     bill.paid ? toCents(bill.paidAmount ?? bill.amount) : null,
@@ -545,6 +634,138 @@ function undoBillPayment(id, updatedBy) {
 
   if (result.changes === 0) {
     throw new Error("Conta nao encontrada.");
+  }
+}
+
+function upsertBillOccurrence(occurrence) {
+  db.prepare(
+    `insert into bill_occurrences (
+      parent_id, competence, due_date, amount_cents, category, owner, notes,
+      paid, paid_amount_cents, paid_date, paid_by, payment_method, payment_notes,
+      updated_by, deleted
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(parent_id, competence) do update set
+      due_date = excluded.due_date,
+      amount_cents = excluded.amount_cents,
+      category = excluded.category,
+      owner = excluded.owner,
+      notes = excluded.notes,
+      paid = excluded.paid,
+      paid_amount_cents = excluded.paid_amount_cents,
+      paid_date = excluded.paid_date,
+      paid_by = excluded.paid_by,
+      payment_method = excluded.payment_method,
+      payment_notes = excluded.payment_notes,
+      updated_by = excluded.updated_by,
+      deleted = excluded.deleted`,
+  ).run(
+    occurrence.parentId,
+    occurrence.competence,
+    occurrence.dueDate,
+    occurrence.amount == null ? null : toCents(occurrence.amount),
+    occurrence.category,
+    occurrence.owner,
+    occurrence.notes,
+    occurrence.paid ? 1 : 0,
+    occurrence.paid ? toCents(occurrence.paidAmount) : null,
+    occurrence.paid ? occurrence.paidDate : null,
+    occurrence.paid ? occurrence.paidBy : null,
+    occurrence.paid ? occurrence.paymentMethod || null : null,
+    occurrence.paid ? occurrence.paymentNotes || "" : "",
+    occurrence.updatedBy,
+    occurrence.deleted ? 1 : 0,
+  );
+}
+
+function markBillOccurrencePaid(parentId, competence, payment) {
+  assertRecurringParent(parentId);
+  const current = getBillOccurrence(parentId, competence);
+  upsertBillOccurrence({
+    parentId,
+    competence,
+    dueDate: current?.dueDate || null,
+    amount: current?.amount ?? null,
+    category: current?.category || null,
+    owner: current?.owner || null,
+    notes: current?.notes ?? null,
+    paid: true,
+    paidAmount: payment.amount,
+    paidDate: payment.date,
+    paidBy: payment.by,
+    paymentMethod: payment.method,
+    paymentNotes: payment.notes,
+    updatedBy: payment.updatedBy,
+    deleted: false,
+  });
+}
+
+function undoBillOccurrencePayment(parentId, competence, updatedBy) {
+  assertChoice(updatedBy, ["Andre", "Luciana"], "updatedBy");
+  assertRecurringParent(parentId);
+  const current = getBillOccurrence(parentId, competence);
+  upsertBillOccurrence({
+    parentId,
+    competence,
+    dueDate: current?.dueDate || null,
+    amount: current?.amount ?? null,
+    category: current?.category || null,
+    owner: current?.owner || null,
+    notes: current?.notes ?? null,
+    paid: false,
+    paidAmount: null,
+    paidDate: null,
+    paidBy: null,
+    paymentMethod: null,
+    paymentNotes: "",
+    updatedBy,
+    deleted: false,
+  });
+}
+
+function endBillRecurrence(id, recurrenceUntil, updatedBy) {
+  assertChoice(updatedBy, ["Andre", "Luciana"], "updatedBy");
+  if (recurrenceUntil) assertDate(recurrenceUntil, "recurrenceUntil");
+
+  const result = db
+    .prepare("update bills set recurrence_until = ?, updated_by = ? where id = ? and recurrence in ('Mensal', 'Anual')")
+    .run(recurrenceUntil, updatedBy, id);
+
+  if (result.changes === 0) {
+    throw new Error("Conta recorrente nao encontrada.");
+  }
+}
+
+function splitRecurringBill(parentId, competence, bill) {
+  assertRecurringParent(parentId);
+  assertMonthKey(competence, "competence");
+  const recurrenceUntil = previousMonthEnd(competence);
+
+  transaction(() => {
+    endBillRecurrence(parentId, recurrenceUntil, bill.updatedBy);
+    upsertBill(bill);
+  });
+
+  return getBill(bill.id);
+}
+
+function getBillOccurrence(parentId, competence) {
+  const row = db
+    .prepare(
+      `select parent_id, competence, due_date, amount_cents, category, owner, notes,
+              paid, paid_amount_cents, paid_date, paid_by, payment_method, payment_notes,
+              updated_by, deleted
+         from bill_occurrences
+        where parent_id = ? and competence = ?`,
+    )
+    .get(parentId, competence);
+
+  return row ? rowToBillOccurrence(row) : null;
+}
+
+function assertRecurringParent(parentId) {
+  const bill = getBill(parentId);
+  if (!bill || bill.recurrence === "Unica") {
+    throw new Error("Conta recorrente nao encontrada.");
   }
 }
 
@@ -668,6 +889,7 @@ function getBill(id) {
   const row = db
     .prepare(
       `select id, name, amount_cents, due_date, category, owner, recurrence, notes,
+              recurrence_until,
               paid, paid_amount_cents, paid_date, paid_by, payment_method, payment_notes,
               created_by, updated_by
          from bills
@@ -686,6 +908,7 @@ function normalizeBill(raw) {
   const paidDate = paid ? String(raw.paidDate || "") : null;
   const createdBy = raw.createdBy || "Andre";
   const updatedBy = raw.updatedBy || createdBy;
+  const recurrenceUntil = optionalDate(raw.recurrenceUntil, "recurrenceUntil");
 
   if (!Number.isFinite(amount) || amount < 0) throw new Error("Valor previsto invalido.");
   if (paid && (!Number.isFinite(paidAmount) || paidAmount < 0)) throw new Error("Valor pago invalido.");
@@ -706,6 +929,7 @@ function normalizeBill(raw) {
     category: raw.category,
     owner: raw.owner,
     recurrence: raw.recurrence,
+    recurrenceUntil,
     notes: String(raw.notes || "").trim(),
     paid,
     paidAmount,
@@ -715,6 +939,46 @@ function normalizeBill(raw) {
     paymentNotes: paid ? String(raw.paymentNotes || "").trim() : "",
     createdBy,
     updatedBy,
+  };
+}
+
+function normalizeBillOccurrence(raw) {
+  const paid = Boolean(raw.paid);
+  const deleted = Boolean(raw.deleted);
+  const amount = raw.amount === "" || raw.amount == null ? null : Number(raw.amount);
+  const paidAmount = paid ? Number(raw.paidAmount ?? raw.amount) : null;
+  const paidDate = paid ? String(raw.paidDate || "") : null;
+  const updatedBy = raw.updatedBy || raw.paidBy || "Andre";
+  const dueDate = optionalDate(raw.dueDate, "dueDate");
+  const category = raw.category ? cleanText(raw.category, "category") : null;
+  const owner = raw.owner || null;
+
+  assertRecurringParent(raw.parentId);
+  assertMonthKey(raw.competence, "competence");
+  if (amount != null && (!Number.isFinite(amount) || amount < 0)) throw new Error("Valor previsto invalido.");
+  if (paid && (!Number.isFinite(paidAmount) || paidAmount < 0)) throw new Error("Valor pago invalido.");
+  if (paid) assertDate(paidDate, "paidDate");
+  if (category) assertChoice(category, getDefaultCategories().map((item) => item.name), "category");
+  if (owner) assertChoice(owner, ["Andre", "Luciana", "Ambos"], "owner");
+  assertChoice(updatedBy, ["Andre", "Luciana"], "updatedBy");
+  if (paid) assertChoice(raw.paidBy, ["Andre", "Luciana"], "paidBy");
+
+  return {
+    parentId: raw.parentId,
+    competence: raw.competence,
+    dueDate,
+    amount,
+    category,
+    owner,
+    notes: raw.notes == null ? null : String(raw.notes).trim(),
+    paid,
+    paidAmount,
+    paidDate,
+    paidBy: paid ? raw.paidBy : null,
+    paymentMethod: paid ? String(raw.paymentMethod || "Pix").trim() : null,
+    paymentNotes: paid ? String(raw.paymentNotes || "").trim() : "",
+    updatedBy,
+    deleted,
   };
 }
 
@@ -832,6 +1096,7 @@ function rowToBill(row) {
     category: row.category,
     owner: row.owner,
     recurrence: row.recurrence,
+    recurrenceUntil: row.recurrence_until,
     notes: row.notes,
     paid: Boolean(row.paid),
     paidAmount: row.paid_amount_cents == null ? null : fromCents(row.paid_amount_cents),
@@ -841,6 +1106,27 @@ function rowToBill(row) {
     paymentNotes: row.payment_notes,
     createdBy: row.created_by,
     updatedBy: row.updated_by,
+  };
+}
+
+function rowToBillOccurrence(row) {
+  return {
+    id: occurrenceId(row.parent_id, row.competence),
+    parentId: row.parent_id,
+    competence: row.competence,
+    dueDate: row.due_date,
+    amount: row.amount_cents == null ? null : fromCents(row.amount_cents),
+    category: row.category,
+    owner: row.owner,
+    notes: row.notes,
+    paid: Boolean(row.paid),
+    paidAmount: row.paid_amount_cents == null ? null : fromCents(row.paid_amount_cents),
+    paidDate: row.paid_date,
+    paidBy: row.paid_by,
+    paymentMethod: row.payment_method,
+    paymentNotes: row.payment_notes || "",
+    updatedBy: row.updated_by,
+    deleted: Boolean(row.deleted),
   };
 }
 
@@ -914,6 +1200,13 @@ function transaction(callback) {
   } catch (error) {
     db.exec("rollback");
     throw error;
+  }
+}
+
+function ensureColumn(table, column, definition) {
+  const exists = db.prepare(`pragma table_info(${table})`).all().some((item) => item.name === column);
+  if (!exists) {
+    db.exec(`alter table ${table} add column ${column} ${definition}`);
   }
 }
 
@@ -1042,6 +1335,19 @@ function parseCookies(header) {
   }, {});
 }
 
+function occurrenceId(parentId, competence) {
+  return `occ:${parentId}:${competence}`;
+}
+
+function parseOccurrenceId(id) {
+  const match = String(id || "").match(/^occ:([^:]+):(\d{4}-\d{2})$/);
+  return match ? { parentId: match[1], competence: match[2] } : null;
+}
+
+function pathParam(value) {
+  return decodeURIComponent(String(value || ""));
+}
+
 function serializeSessionCookie(request, token, maxAgeSeconds) {
   const secure = process.env.RAILWAY_ENVIRONMENT_ID || request.headers["x-forwarded-proto"] === "https";
   return [
@@ -1095,11 +1401,24 @@ function assertDate(value, field) {
   }
 }
 
+function assertMonthKey(value, field) {
+  if (!/^\d{4}-\d{2}$/.test(String(value || ""))) {
+    throw new Error(`Competencia invalida para ${field}.`);
+  }
+}
+
 function optionalDate(value, field) {
   const text = String(value || "").trim();
   if (!text) return null;
   assertDate(text, field);
   return text;
+}
+
+function previousMonthEnd(competence) {
+  assertMonthKey(competence, "competence");
+  const [year, month] = competence.split("-").map(Number);
+  const date = new Date(year, month - 1, 0);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function getDefaultCategories() {

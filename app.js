@@ -38,12 +38,14 @@ const monthFormatter = new Intl.DateTimeFormat("pt-BR", {
 
 let categories = [...DEFAULT_CATEGORIES];
 let bills = [];
+let billOccurrences = [];
 let revenues = [];
 let selectedMonth = localStorage.getItem(STORAGE_KEYS.selectedMonth) || monthKey(new Date());
 let currentActor = localStorage.getItem(STORAGE_KEYS.actor) || "Andre";
 let lockedActor = null;
 let toastTimer = null;
 let pendingLocalRecovery = null;
+let recurrenceScopeResolver = null;
 
 const elements = {
   summaryGrid: document.querySelector("#summaryGrid"),
@@ -60,6 +62,10 @@ const elements = {
   billDialogTitle: document.querySelector("#billDialogTitle"),
   paymentDialog: document.querySelector("#paymentDialog"),
   paymentForm: document.querySelector("#paymentForm"),
+  recurrenceScopeDialog: document.querySelector("#recurrenceScopeDialog"),
+  recurrenceScopeTitle: document.querySelector("#recurrenceScopeTitle"),
+  recurrenceScopeText: document.querySelector("#recurrenceScopeText"),
+  recurrenceScopeName: document.querySelector("#recurrenceScopeName"),
   revenueDialog: document.querySelector("#revenueDialog"),
   revenueForm: document.querySelector("#revenueForm"),
   revenueDialogTitle: document.querySelector("#revenueDialogTitle"),
@@ -137,6 +143,13 @@ function bindEvents() {
   elements.billForm.addEventListener("submit", saveBillFromForm);
   elements.paymentForm.addEventListener("submit", savePaymentFromForm);
   elements.revenueForm.addEventListener("submit", saveRevenueFromForm);
+
+  elements.recurrenceScopeDialog?.addEventListener("close", () => {
+    if (!recurrenceScopeResolver) return;
+    const resolve = recurrenceScopeResolver;
+    recurrenceScopeResolver = null;
+    resolve(elements.recurrenceScopeDialog.returnValue || null);
+  });
 }
 
 async function loadInitialState() {
@@ -194,6 +207,7 @@ async function refreshState() {
 
 function applyState(state) {
   bills = Array.isArray(state.bills) ? state.bills : [];
+  billOccurrences = Array.isArray(state.billOccurrences) ? state.billOccurrences : [];
   revenues = Array.isArray(state.revenues) ? state.revenues : [];
   categories = Array.isArray(state.categories) && state.categories.length ? state.categories : [...DEFAULT_CATEGORIES];
   populateCategoryOptions();
@@ -475,31 +489,18 @@ async function saveBillFromForm(event) {
   try {
     const id = document.querySelector("#billId").value;
     const existing = id ? findBill(id) : null;
-    const initialPaid = document.querySelector("#billInitialStatus").value === "paid";
-    const paid = existing ? existing.paid || initialPaid : initialPaid;
-    const today = todayKey();
+    const payload = buildBillPayloadFromForm(existing, id);
+    let targetMonth = monthKey(dateFromKey(payload.dueDate));
 
-    const payload = {
-      id: id || createId(),
-      name: document.querySelector("#billName").value.trim(),
-      amount: Number(document.querySelector("#billAmount").value),
-      dueDate: document.querySelector("#billDueDate").value,
-      category: document.querySelector("#billCategory").value,
-      owner: document.querySelector("#billOwner").value,
-      recurrence: document.querySelector("#billRecurrence").value,
-      notes: document.querySelector("#billNotes").value.trim(),
-      paid,
-      paidAmount: existing?.paidAmount || (paid ? Number(document.querySelector("#billAmount").value) : null),
-      paidDate: existing?.paidDate || (paid ? today : null),
-      paidBy: existing?.paidBy || (paid ? currentActor : null),
-      paymentMethod: existing?.paymentMethod || (paid ? "Pix" : null),
-      paymentNotes: existing?.paymentNotes || "",
-      createdBy: existing?.createdBy || currentActor,
-      updatedBy: currentActor,
-    };
+    if (existing?.isRecurringOccurrence) {
+      const scope = await chooseRecurrenceScope("edit", existing);
+      if (!scope) return;
+      targetMonth = await saveRecurringBillEdit(existing, payload, scope);
+    } else {
+      await apiRequest("/api/bills", { method: "POST", body: payload });
+    }
 
-    await apiRequest("/api/bills", { method: "POST", body: payload });
-    setSelectedMonth(monthKey(dateFromKey(payload.dueDate)), { renderNow: false });
+    setSelectedMonth(targetMonth, { renderNow: false });
     await refreshState();
     elements.billDialog.close();
     render();
@@ -562,12 +563,199 @@ async function undoPayment(id) {
 async function deleteBill(id) {
   const bill = findBill(id);
   if (!bill) return;
-  if (!confirm(`Excluir "${bill.name}"?`)) return;
 
-  await apiRequest(`/api/bills/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (bill.isRecurringOccurrence) {
+    const scope = await chooseRecurrenceScope("delete", bill);
+    if (!scope) return;
+    await deleteRecurringBill(bill, scope);
+  } else {
+    if (!confirm(`Excluir "${bill.name}"?`)) return;
+    await apiRequest(`/api/bills/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
   await refreshState();
   render();
   showToast("Conta excluida.");
+}
+
+function buildBillPayloadFromForm(existing, id) {
+  const amount = Number(document.querySelector("#billAmount").value);
+  const initialPaid = document.querySelector("#billInitialStatus").value === "paid";
+  const paid = existing ? existing.paid || initialPaid : initialPaid;
+  const recurrence = document.querySelector("#billRecurrence").value;
+  const today = todayKey();
+
+  return {
+    id: id || createId(),
+    name: document.querySelector("#billName").value.trim(),
+    amount,
+    dueDate: document.querySelector("#billDueDate").value,
+    category: document.querySelector("#billCategory").value,
+    owner: document.querySelector("#billOwner").value,
+    recurrence,
+    recurrenceUntil: recurrence === "Unica" ? null : existing?.recurrenceUntil || null,
+    notes: document.querySelector("#billNotes").value.trim(),
+    paid,
+    paidAmount: existing?.paidAmount || (paid ? amount : null),
+    paidDate: existing?.paidDate || (paid ? today : null),
+    paidBy: existing?.paidBy || (paid ? currentActor : null),
+    paymentMethod: existing?.paymentMethod || (paid ? "Pix" : null),
+    paymentNotes: existing?.paymentNotes || "",
+    createdBy: existing?.createdBy || currentActor,
+    updatedBy: currentActor,
+  };
+}
+
+async function saveRecurringBillEdit(existing, payload, scope) {
+  if (scope === "one") {
+    await apiRequest("/api/bill-occurrences", {
+      method: "POST",
+      body: occurrencePayloadFromBill(existing, payload),
+    });
+    return existing.competence;
+  }
+
+  if (scope === "future") {
+    const scopedPayload = scopedPayloadForOccurrenceMonth(existing, payload);
+    await apiRequest("/api/recurring-bills/split", {
+      method: "POST",
+      body: {
+        parentId: existing.parentId,
+        competence: existing.competence,
+        bill: {
+          ...scopedPayload,
+          id: createId(),
+          recurrenceUntil: null,
+          createdBy: currentActor,
+          updatedBy: currentActor,
+        },
+      },
+    });
+    return existing.competence;
+  }
+
+  if (scope === "all") {
+    await apiRequest("/api/bills", {
+      method: "POST",
+      body: payloadForWholeRecurrence(existing, payload),
+    });
+    return existing.competence;
+  }
+
+  return monthKey(dateFromKey(payload.dueDate));
+}
+
+async function deleteRecurringBill(bill, scope) {
+  if (scope === "one") {
+    await apiRequest("/api/bill-occurrences", {
+      method: "POST",
+      body: {
+        parentId: bill.parentId,
+        competence: bill.competence,
+        updatedBy: currentActor,
+        deleted: true,
+        paid: false,
+      },
+    });
+    return;
+  }
+
+  if (scope === "future") {
+    await apiRequest(`/api/bills/${encodeURIComponent(bill.parentId)}/recurrence-end`, {
+      method: "PATCH",
+      body: {
+        recurrenceUntil: previousMonthEnd(bill.competence),
+        updatedBy: currentActor,
+      },
+    });
+    return;
+  }
+
+  if (scope === "all") {
+    await apiRequest(`/api/bills/${encodeURIComponent(bill.parentId)}`, { method: "DELETE" });
+  }
+}
+
+function occurrencePayloadFromBill(existing, payload) {
+  const scopedPayload = scopedPayloadForOccurrenceMonth(existing, payload);
+  return {
+    parentId: existing.parentId,
+    competence: existing.competence,
+    dueDate: scopedPayload.dueDate,
+    amount: scopedPayload.amount,
+    category: scopedPayload.category,
+    owner: scopedPayload.owner,
+    notes: scopedPayload.notes,
+    paid: scopedPayload.paid,
+    paidAmount: scopedPayload.paid ? scopedPayload.paidAmount || scopedPayload.amount : null,
+    paidDate: scopedPayload.paid ? scopedPayload.paidDate || todayKey() : null,
+    paidBy: scopedPayload.paid ? scopedPayload.paidBy || currentActor : null,
+    paymentMethod: scopedPayload.paid ? scopedPayload.paymentMethod || "Pix" : null,
+    paymentNotes: scopedPayload.paid ? scopedPayload.paymentNotes || "" : "",
+    updatedBy: currentActor,
+    deleted: false,
+  };
+}
+
+function scopedPayloadForOccurrenceMonth(existing, payload) {
+  return {
+    ...payload,
+    dueDate: dateWithMonthAndDay(existing.competence, payload.dueDate),
+  };
+}
+
+function payloadForWholeRecurrence(existing, payload) {
+  const parent = findBaseBill(existing);
+  const parentMonth = monthKey(dateFromKey(parent.dueDate));
+  const recurrence = payload.recurrence;
+
+  return {
+    ...payload,
+    id: parent.id,
+    dueDate: dateWithMonthAndDay(parentMonth, payload.dueDate),
+    recurrence,
+    recurrenceUntil: recurrence === "Unica" ? null : parent.recurrenceUntil || null,
+    paid: parent.paid,
+    paidAmount: parent.paidAmount,
+    paidDate: parent.paidDate,
+    paidBy: parent.paidBy,
+    paymentMethod: parent.paymentMethod,
+    paymentNotes: parent.paymentNotes || "",
+    createdBy: parent.createdBy || currentActor,
+    updatedBy: currentActor,
+  };
+}
+
+function chooseRecurrenceScope(action, bill) {
+  if (!elements.recurrenceScopeDialog) {
+    return Promise.resolve(promptRecurrenceScope(action));
+  }
+
+  if (recurrenceScopeResolver) {
+    recurrenceScopeResolver(null);
+    recurrenceScopeResolver = null;
+  }
+
+  elements.recurrenceScopeTitle.textContent = action === "delete" ? "Excluir recorrencia" : "Editar recorrencia";
+  elements.recurrenceScopeText.textContent =
+    action === "delete"
+      ? "Escolha o alcance da exclusao para esta conta recorrente."
+      : "Escolha o alcance da alteracao para esta conta recorrente.";
+  elements.recurrenceScopeName.textContent = bill.name;
+  elements.recurrenceScopeDialog.returnValue = "";
+  elements.recurrenceScopeDialog.showModal();
+
+  return new Promise((resolve) => {
+    recurrenceScopeResolver = resolve;
+  });
+}
+
+function promptRecurrenceScope(action) {
+  const answer = window.prompt(
+    `${action === "delete" ? "Excluir" : "Editar"} recorrencia:\n1 - Apenas esta ocorrencia\n2 - Esta e as proximas\n3 - Toda a recorrencia`,
+    "1",
+  );
+  return { 1: "one", 2: "future", 3: "all" }[String(answer || "").trim()] || null;
 }
 
 function openRevenueDialog(revenue = null) {
@@ -639,7 +827,82 @@ function statusForBill(bill) {
 }
 
 function getMonthBills() {
-  return bills.filter((bill) => monthKey(dateFromKey(bill.dueDate)) === selectedMonth);
+  return getBillsForMonth(selectedMonth);
+}
+
+function getBillsForMonth(month) {
+  const uniqueBills = bills.filter((bill) => bill.recurrence === "Unica" && monthKey(dateFromKey(bill.dueDate)) === month);
+  const recurringBills = bills
+    .filter((bill) => bill.recurrence !== "Unica" && recurrenceAppliesToMonth(bill, month))
+    .map((bill) => buildRecurringOccurrence(bill, month))
+    .filter(Boolean);
+
+  return [...uniqueBills, ...recurringBills];
+}
+
+function recurrenceAppliesToMonth(bill, month) {
+  const start = monthKey(dateFromKey(bill.dueDate));
+  if (month < start) return false;
+  if (bill.recurrenceUntil && month > monthKey(dateFromKey(bill.recurrenceUntil))) return false;
+  if (bill.recurrence === "Mensal") return true;
+  if (bill.recurrence === "Anual") return month.slice(5) === start.slice(5);
+  return false;
+}
+
+function buildRecurringOccurrence(bill, month) {
+  const override = findOccurrenceOverride(bill.id, month);
+  if (override?.deleted) return null;
+
+  const isBaseMonth = monthKey(dateFromKey(bill.dueDate)) === month;
+  const dueDate = override?.dueDate || recurringDueDate(bill.dueDate, month);
+  const paid = override ? override.paid : isBaseMonth && bill.paid;
+
+  return {
+    ...bill,
+    id: occurrenceId(bill.id, month),
+    parentId: bill.id,
+    competence: month,
+    isRecurringOccurrence: true,
+    dueDate,
+    amount: override?.amount ?? bill.amount,
+    category: override?.category || bill.category,
+    owner: override?.owner || bill.owner,
+    notes: override?.notes ?? bill.notes,
+    paid,
+    paidAmount: paid ? override?.paidAmount ?? (isBaseMonth ? bill.paidAmount : null) : null,
+    paidDate: paid ? override?.paidDate ?? (isBaseMonth ? bill.paidDate : null) : null,
+    paidBy: paid ? override?.paidBy ?? (isBaseMonth ? bill.paidBy : null) : null,
+    paymentMethod: paid ? override?.paymentMethod ?? (isBaseMonth ? bill.paymentMethod : null) : null,
+    paymentNotes: paid ? override?.paymentNotes ?? (isBaseMonth ? bill.paymentNotes : "") : "",
+    updatedBy: override?.updatedBy || bill.updatedBy,
+  };
+}
+
+function findOccurrenceOverride(parentId, competence) {
+  return billOccurrences.find((item) => item.parentId === parentId && item.competence === competence);
+}
+
+function recurringDueDate(baseDueDate, month) {
+  const [, , originalDayRaw] = baseDueDate.split("-").map(Number);
+  return dateWithMonthAndDay(month, originalDayRaw);
+}
+
+function dateWithMonthAndDay(month, daySource) {
+  const originalDayRaw = typeof daySource === "number" ? daySource : Number(String(daySource || "").slice(8, 10));
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  const day = Math.min(originalDayRaw, lastDay);
+  return `${month}-${String(day).padStart(2, "0")}`;
+}
+
+function occurrenceId(parentId, competence) {
+  return `occ:${parentId}:${competence}`;
+}
+
+function previousMonthEnd(competence) {
+  const [year, month] = competence.split("-").map(Number);
+  const date = new Date(year, month - 1, 0);
+  return dateKey(date);
 }
 
 function getMonthRevenues() {
@@ -776,7 +1039,13 @@ function normalizeSnapshotItems(items, keys) {
 }
 
 function findBill(id) {
-  return bills.find((bill) => bill.id === id);
+  return getMonthBills().find((bill) => bill.id === id) || bills.find((bill) => bill.id === id);
+}
+
+function findBaseBill(bill) {
+  const parent = bills.find((item) => item.id === bill.parentId || item.id === bill.id);
+  if (!parent) throw new Error("Conta base da recorrencia nao encontrada.");
+  return parent;
 }
 
 function findRevenue(id) {

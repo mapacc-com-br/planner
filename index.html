@@ -314,6 +314,44 @@
       </form>
     </dialog>
 
+    <dialog class="modal scope-modal" id="recurrenceScopeDialog">
+      <form class="modal-body" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Conta recorrente</p>
+            <h2 id="recurrenceScopeTitle">Editar recorrencia</h2>
+          </div>
+          <button class="icon-button" type="submit" value="" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <div class="scope-copy">
+          <strong id="recurrenceScopeName">Conta</strong>
+          <span id="recurrenceScopeText">Escolha o alcance da alteracao para esta conta recorrente.</span>
+        </div>
+
+        <div class="scope-options">
+          <button class="scope-button" type="submit" value="one">
+            <strong>Apenas esta</strong>
+            <span>Altera somente a ocorrencia deste mes.</span>
+          </button>
+          <button class="scope-button" type="submit" value="future">
+            <strong>Esta e proximas</strong>
+            <span>Cria uma nova sequencia a partir deste mes.</span>
+          </button>
+          <button class="scope-button danger" type="submit" value="all">
+            <strong>Toda recorrencia</strong>
+            <span>Aplica na serie inteira desta conta.</span>
+          </button>
+        </div>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="submit" value="">Cancelar</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog class="modal" id="revenueDialog">
       <form class="modal-body" id="revenueForm" method="dialog">
         <div class="modal-header">
