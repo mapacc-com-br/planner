@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   bills: "plannerFinanceiro:bills",
   revenues: "plannerFinanceiro:revenues",
   actor: "plannerFinanceiro:actor",
+  ownerFilter: "plannerFinanceiro:ownerFilter",
   selectedMonth: "plannerFinanceiro:selectedMonth",
 };
 
@@ -42,6 +43,7 @@ let billOccurrences = [];
 let revenues = [];
 let selectedMonth = localStorage.getItem(STORAGE_KEYS.selectedMonth) || monthKey(new Date());
 let currentActor = localStorage.getItem(STORAGE_KEYS.actor) || "Andre";
+let ownerFilter = localStorage.getItem(STORAGE_KEYS.ownerFilter) || "Todos";
 let lockedActor = null;
 let toastTimer = null;
 let pendingLocalRecovery = null;
@@ -117,6 +119,14 @@ function bindEvents() {
       if (lockedActor && button.dataset.actor !== lockedActor) return;
       currentActor = button.dataset.actor;
       localStorage.setItem(STORAGE_KEYS.actor, currentActor);
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-owner-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ownerFilter = button.dataset.ownerFilter;
+      localStorage.setItem(STORAGE_KEYS.ownerFilter, ownerFilter);
       render();
     });
   });
@@ -257,6 +267,7 @@ function render() {
   localStorage.setItem(STORAGE_KEYS.selectedMonth, selectedMonth);
   elements.monthLabel.textContent = capitalize(monthFormatter.format(dateFromMonthKey(selectedMonth)));
   renderActorSwitch();
+  renderOwnerFilter();
   renderSummary();
   renderUrgentList();
   renderPaidList();
@@ -276,14 +287,20 @@ function renderActorSwitch() {
   });
 }
 
+function renderOwnerFilter() {
+  document.querySelectorAll("[data-owner-filter]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.ownerFilter === ownerFilter);
+  });
+}
+
 async function logout() {
   await apiRequest("/api/logout", { method: "POST" });
   window.location.href = "/login.html";
 }
 
 function renderSummary() {
-  const monthBills = getMonthBills();
-  const monthRevenues = getMonthRevenues();
+  const monthBills = getVisibleMonthBills();
+  const monthRevenues = getVisibleMonthRevenues();
   const totalIncome = sum(monthRevenues, "amount");
   const totalBills = sum(monthBills, "amount");
   const totalPaid = monthBills.reduce((total, bill) => total + (bill.paid ? Number(bill.paidAmount || bill.amount) : 0), 0);
@@ -312,7 +329,7 @@ function renderSummary() {
 }
 
 function renderUrgentList() {
-  const unpaid = getMonthBills()
+  const unpaid = getVisibleMonthBills()
     .filter((bill) => !bill.paid)
     .sort((a, b) => dateFromKey(a.dueDate) - dateFromKey(b.dueDate));
 
@@ -326,7 +343,7 @@ function renderUrgentList() {
 }
 
 function renderPaidList() {
-  const paid = getMonthBills()
+  const paid = getVisibleMonthBills()
     .filter((bill) => bill.paid)
     .sort((a, b) => dateFromKey(b.paidDate || b.dueDate) - dateFromKey(a.paidDate || a.dueDate));
 
@@ -337,7 +354,7 @@ function renderPaidList() {
 }
 
 function renderAllBills() {
-  const monthBills = getMonthBills().sort((a, b) => {
+  const monthBills = getVisibleMonthBills().sort((a, b) => {
     if (a.paid !== b.paid) return Number(a.paid) - Number(b.paid);
     return dateFromKey(a.dueDate) - dateFromKey(b.dueDate);
   });
@@ -348,7 +365,7 @@ function renderAllBills() {
 }
 
 function renderCategoryMap() {
-  const monthBills = getMonthBills();
+  const monthBills = getVisibleMonthBills();
   const totals = categories
     .map((category) => ({
       ...category,
@@ -382,7 +399,7 @@ function renderCategoryMap() {
 }
 
 function renderRevenues() {
-  const monthRevenues = getMonthRevenues().sort((a, b) => dateFromKey(a.date) - dateFromKey(b.date));
+  const monthRevenues = getVisibleMonthRevenues().sort((a, b) => dateFromKey(a.date) - dateFromKey(b.date));
 
   elements.revenueList.innerHTML = monthRevenues.length
     ? monthRevenues
@@ -907,6 +924,20 @@ function previousMonthEnd(competence) {
 
 function getMonthRevenues() {
   return revenues.filter((revenue) => monthKey(dateFromKey(revenue.date)) === selectedMonth);
+}
+
+function getVisibleMonthBills() {
+  return getMonthBills().filter(ownerMatchesFilter);
+}
+
+function getVisibleMonthRevenues() {
+  return getMonthRevenues().filter(ownerMatchesFilter);
+}
+
+function ownerMatchesFilter(item) {
+  if (ownerFilter === "Todos") return true;
+  if (ownerFilter === "Ambos") return item.owner === "Ambos";
+  return item.owner === ownerFilter || item.owner === "Ambos";
 }
 
 function shiftMonth(amount) {

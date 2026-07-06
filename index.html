@@ -86,14 +86,22 @@
             <p class="eyebrow">Mapa financeiro do mes</p>
             <h2 id="monthLabel">Julho de 2026</h2>
           </div>
-          <div class="month-actions">
-            <button class="icon-button" id="previousMonth" title="Mes anterior" aria-label="Mes anterior">
-              <i data-lucide="chevron-left"></i>
-            </button>
-            <button class="text-button" id="currentMonth">Hoje</button>
-            <button class="icon-button" id="nextMonth" title="Proximo mes" aria-label="Proximo mes">
-              <i data-lucide="chevron-right"></i>
-            </button>
+          <div class="month-controls">
+            <div class="owner-filter" aria-label="Filtrar por responsavel">
+              <button class="owner-filter-button is-active" data-owner-filter="Todos">Todos</button>
+              <button class="owner-filter-button" data-owner-filter="Andre">Andre</button>
+              <button class="owner-filter-button" data-owner-filter="Luciana">Luciana</button>
+              <button class="owner-filter-button" data-owner-filter="Ambos">Ambos</button>
+            </div>
+            <div class="month-actions">
+              <button class="icon-button" id="previousMonth" title="Mes anterior" aria-label="Mes anterior">
+                <i data-lucide="chevron-left"></i>
+              </button>
+              <button class="text-button" id="currentMonth">Hoje</button>
+              <button class="icon-button" id="nextMonth" title="Proximo mes" aria-label="Proximo mes">
+                <i data-lucide="chevron-right"></i>
+              </button>
+            </div>
           </div>
         </section>
 

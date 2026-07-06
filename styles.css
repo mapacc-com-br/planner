@@ -337,6 +337,38 @@ h3 {
   gap: 8px;
 }
 
+.month-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.owner-filter {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.owner-filter-button {
+  min-height: 36px;
+  padding: 0 12px;
+  color: rgba(255, 255, 255, 0.84);
+  border-radius: 6px;
+  background: transparent;
+}
+
+.owner-filter-button.is-active {
+  color: var(--blue-deep);
+  background: #ffffff;
+  box-shadow: 0 10px 20px rgba(12, 54, 96, 0.14);
+}
+
 .statement-tools,
 .filter-bar {
   display: inline-flex;
@@ -997,6 +1029,7 @@ h3 {
 .icon-button:focus-visible,
 .text-button:focus-visible,
 .compact-button:focus-visible,
+.owner-filter-button:focus-visible,
 .primary-button:focus-visible,
 .ghost-button:focus-visible,
 .danger-button:focus-visible,
@@ -1088,6 +1121,7 @@ h3 {
 
   .brand-block,
   .top-actions,
+  .month-controls,
   .month-actions,
   .actor-switch,
   .statement-tools,
@@ -1099,6 +1133,16 @@ h3 {
   .filter-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .month-controls,
+  .owner-filter {
+    width: 100%;
+  }
+
+  .owner-filter {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .statement-tools select,
