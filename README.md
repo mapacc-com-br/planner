@@ -28,6 +28,12 @@ Pagina de patrimonio:
 http://localhost:8080/patrimonio.html
 ```
 
+Pagina de viagens:
+
+```text
+http://localhost:8080/viagens.html
+```
+
 Para usar exatamente `http://localhost`, a porta 80 precisa estar livre:
 
 ```powershell
@@ -61,6 +67,30 @@ Tabelas principais:
 - `assets`
 - `card_statements`
 - `card_transactions`
+- `trips`
+- `trip_travelers`
+- `trip_categories`
+- `trip_expenses`
+- `trip_expense_participants`
+- `trip_installments`
+- `trip_reservations`
+- `trip_itinerary_items`
+- `trip_checklist_items`
+- `trip_documents`
+
+## Viagens
+
+A area **Viagens** adiciona planejamento de viagem integrado ao Planner Financeiro:
+
+- cadastro de viagens e viajantes;
+- orcamento por categoria;
+- despesas em varias moedas com cotacao registrada;
+- rateio simples entre viajantes;
+- parcelamentos com opcao de gerar contas no Planner;
+- reservas, roteiro, checklist e documentos;
+- relatorio de orcamento, pagamentos e acerto entre viajantes.
+
+Quando uma despesa parcelada e enviada para o Planner, cada parcela gera uma conta vinculada. Ao excluir a despesa ou a viagem, as contas vinculadas tambem sao removidas para evitar duplicidade.
 
 Backups consistentes sao criados pelo botao **Backup**:
 

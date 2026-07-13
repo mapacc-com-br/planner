@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Viagens - Planner financeiro</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacao principal">
+        <div class="sidebar-mark" aria-hidden="true">
+          <i data-lucide="calendar-check"></i>
+        </div>
+        <nav class="sidebar-nav">
+          <a class="sidebar-button" href="./index.html" title="Planner financeiro" aria-label="Planner financeiro">
+            <i data-lucide="home"></i>
+          </a>
+          <a class="sidebar-button" href="./patrimonio.html" title="Patrimonio" aria-label="Patrimonio">
+            <i data-lucide="landmark"></i>
+          </a>
+          <a class="sidebar-button" href="./cartao.html" title="Cartao" aria-label="Cartao">
+            <i data-lucide="credit-card"></i>
+          </a>
+          <a class="sidebar-button is-active" href="./viagens.html" title="Viagens" aria-label="Viagens">
+            <i data-lucide="plane-takeoff"></i>
+          </a>
+          <button class="sidebar-button" title="Contas" aria-label="Contas">
+            <i data-lucide="receipt-text"></i>
+          </button>
+          <button class="sidebar-button" title="Relatorios" aria-label="Relatorios">
+            <i data-lucide="chart-no-axes-column-increasing"></i>
+          </button>
+        </nav>
+      </aside>
+
+      <nav class="mobile-nav" aria-label="Navegacao mobile">
+        <a class="mobile-nav-link" href="./index.html">
+          <i data-lucide="home"></i>
+          <span>Planner</span>
+        </a>
+        <a class="mobile-nav-link" href="./patrimonio.html">
+          <i data-lucide="landmark"></i>
+          <span>Patrimonio</span>
+        </a>
+        <a class="mobile-nav-link" href="./cartao.html">
+          <i data-lucide="credit-card"></i>
+          <span>Cartao</span>
+        </a>
+        <a class="mobile-nav-link is-active" href="./viagens.html">
+          <i data-lucide="plane-takeoff"></i>
+          <span>Viagens</span>
+        </a>
+      </nav>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="brand-block">
+            <div class="brand-mark" aria-hidden="true">
+              <i data-lucide="plane-takeoff"></i>
+            </div>
+            <div>
+              <p class="eyebrow">Planejamento compartilhado</p>
+              <h1>Viagens</h1>
+            </div>
+          </div>
+
+          <div class="top-actions">
+            <button class="compact-button" id="backupDatabase">
+              <i data-lucide="database"></i>
+              Backup
+            </button>
+            <button class="compact-button" id="logoutButton">
+              <i data-lucide="log-out"></i>
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <section class="month-strip travel-strip" aria-label="Planejamento de viagens">
+          <div>
+            <p class="eyebrow">Mapa de viagens</p>
+            <h2>Planejar, pagar e viajar com clareza</h2>
+          </div>
+          <div class="trip-toolbar">
+            <input id="tripSearch" type="search" placeholder="Buscar viagem ou destino" />
+            <select id="tripStatusFilter" aria-label="Filtrar viagens">
+              <option value="active">Proximas e em andamento</option>
+              <option value="Planejamento">Planejamento</option>
+              <option value="Confirmada">Confirmadas</option>
+              <option value="Em andamento">Em andamento</option>
+              <option value="Concluida">Concluidas</option>
+              <option value="Arquivada">Arquivadas</option>
+              <option value="all">Todas</option>
+            </select>
+            <button class="primary-button" id="openTripForm">
+              <i data-lucide="plus"></i>
+              Nova viagem
+            </button>
+          </div>
+        </section>
+
+        <section class="summary-grid" id="tripSummary" aria-label="Resumo de viagens"></section>
+
+        <section class="travel-layout">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Viagens</p>
+                <h3>Planejadas e recentes</h3>
+              </div>
+              <span class="count-pill" id="tripCount">0</span>
+            </div>
+            <div class="trip-card-list" id="tripList"></div>
+          </section>
+
+          <section class="panel trip-detail-panel" id="tripDetail" hidden>
+            <div class="panel-header trip-detail-header">
+              <div>
+                <p class="eyebrow" id="tripDetailKicker">Viagem</p>
+                <h3 id="tripDetailTitle">Selecione uma viagem</h3>
+                <p class="patrimony-note" id="tripDetailMeta"></p>
+              </div>
+              <div class="travel-actions">
+                <button class="compact-button" id="openExpenseForm">
+                  <i data-lucide="receipt-text"></i>
+                  Despesa
+                </button>
+                <button class="icon-button" id="editActiveTrip" title="Editar viagem" aria-label="Editar viagem">
+                  <i data-lucide="pencil"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="tab-bar" aria-label="Abas da viagem">
+              <button class="tab-button is-active" data-trip-tab="overview">Visao geral</button>
+              <button class="tab-button" data-trip-tab="budget">Orcamento</button>
+              <button class="tab-button" data-trip-tab="expenses">Despesas</button>
+              <button class="tab-button" data-trip-tab="itinerary">Roteiro</button>
+              <button class="tab-button" data-trip-tab="reservations">Reservas</button>
+              <button class="tab-button" data-trip-tab="checklist">Checklist</button>
+              <button class="tab-button" data-trip-tab="documents">Documentos</button>
+              <button class="tab-button" data-trip-tab="report">Relatorio</button>
+            </div>
+
+            <div id="tripTabContent" class="trip-tab-content"></div>
+          </section>
+        </section>
+      </main>
+
+      <button class="fab travel-fab" id="openExpenseFormFloating">
+        <i data-lucide="plus"></i>
+        Despesa
+      </button>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <dialog class="modal" id="tripDialog">
+      <form class="modal-body" id="tripForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Viagem</p>
+            <h2 id="tripDialogTitle">Nova viagem</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="tripDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="tripId" />
+
+        <label class="field">
+          <span>Nome</span>
+          <input id="tripName" type="text" placeholder="Italia 2027" required />
+        </label>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Destino principal</span>
+            <input id="tripDestination" type="text" placeholder="Roma, Florenca e Veneza" required />
+          </label>
+          <label class="field">
+            <span>Outros destinos</span>
+            <input id="tripOtherDestinations" type="text" placeholder="Roma; Florenca; Veneza" />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Inicio</span>
+            <input id="tripStartDate" type="date" required />
+          </label>
+          <label class="field">
+            <span>Fim</span>
+            <input id="tripEndDate" type="date" required />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Status</span>
+            <select id="tripStatus">
+              <option>Planejamento</option>
+              <option>Confirmada</option>
+              <option>Em andamento</option>
+              <option>Concluida</option>
+              <option>Arquivada</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Moeda principal</span>
+            <select id="tripCurrency">
+              <option value="BRL">BRL</option>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GBP">GBP</option>
+              <option value="ARS">ARS</option>
+              <option value="CLP">CLP</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Orcamento total</span>
+            <input id="tripBudget" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Imagem de capa opcional</span>
+            <input id="tripCoverImage" type="url" placeholder="https://..." />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Viajantes</span>
+          <textarea id="tripTravelers" rows="3" placeholder="Andre&#10;Luciana"></textarea>
+        </label>
+
+        <label class="field">
+          <span>Observacoes</span>
+          <textarea id="tripNotes" rows="3" placeholder="Opcional"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="tripDialog">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Salvar viagem
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="categoryDialog">
+      <form class="modal-body" id="categoryForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Orcamento</p>
+            <h2>Categoria</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="categoryDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <input type="hidden" id="categoryId" />
+        <label class="field">
+          <span>Nome</span>
+          <input id="categoryName" required />
+        </label>
+        <div class="form-grid">
+          <label class="field">
+            <span>Valor previsto</span>
+            <input id="categoryPlannedAmount" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Cor</span>
+            <input id="categoryColor" type="color" value="#2478c7" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="categoryDialog">Cancelar</button>
+          <button class="primary-button" type="submit">Salvar categoria</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="expenseDialog">
+      <form class="modal-body" id="expenseForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Despesa</p>
+            <h2 id="expenseDialogTitle">Adicionar despesa</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="expenseDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="expenseId" />
+
+        <label class="field">
+          <span>Descricao</span>
+          <input id="expenseDescription" placeholder="Passagem, hotel, passeio..." required />
+        </label>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Categoria</span>
+            <select id="expenseCategory"></select>
+          </label>
+          <label class="field">
+            <span>Status</span>
+            <select id="expenseStatus">
+              <option>Previsto</option>
+              <option>Reservado</option>
+              <option>Pendente</option>
+              <option>Pago</option>
+              <option>Cancelado</option>
+              <option>Reembolsado</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Valor original</span>
+            <input id="expenseOriginalAmount" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Moeda</span>
+            <select id="expenseCurrency">
+              <option value="BRL">BRL</option>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GBP">GBP</option>
+              <option value="ARS">ARS</option>
+              <option value="CLP">CLP</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Cotacao</span>
+            <input id="expenseExchangeRate" type="number" min="0.000001" step="0.000001" value="1" required />
+          </label>
+          <label class="field">
+            <span>Valor convertido</span>
+            <input id="expenseConvertedAmount" type="number" min="0" step="0.01" />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Data da compra</span>
+            <input id="expenseDate" type="date" required />
+          </label>
+          <label class="field">
+            <span>Vencimento</span>
+            <input id="expenseDueDate" type="date" />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Data do pagamento</span>
+            <input id="expensePaidDate" type="date" />
+          </label>
+          <label class="field">
+            <span>Forma de pagamento</span>
+            <select id="expensePaymentMethod">
+              <option>Cartao de credito</option>
+              <option>Cartao de debito</option>
+              <option>PIX</option>
+              <option>Dinheiro</option>
+              <option>Transferencia</option>
+              <option>Milhas</option>
+              <option>Pontos</option>
+              <option>Outro</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Quem pagou</span>
+            <select id="expensePaidBy"></select>
+          </label>
+          <label class="field">
+            <span>Parcelas</span>
+            <input id="expenseInstallments" type="number" min="1" max="120" value="1" />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Cidade ou destino</span>
+            <input id="expenseDestination" placeholder="Roma" />
+          </label>
+          <label class="field">
+            <span>Cartao ou conta</span>
+            <input id="expenseAccountLabel" placeholder="Cartao principal" />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Participantes</span>
+          <div class="choice-grid" id="expenseParticipants"></div>
+        </label>
+
+        <label class="field inline-check">
+          <input id="expenseSyncPlanner" type="checkbox" />
+          <span>Adicionar parcelas ao Planner Financeiro</span>
+        </label>
+
+        <label class="field">
+          <span>Observacoes</span>
+          <textarea id="expenseNotes" rows="3"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="expenseDialog">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Salvar despesa
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="reservationDialog">
+      <form class="modal-body" id="reservationForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Reserva</p>
+            <h2>Nova reserva</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="reservationDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <input type="hidden" id="reservationId" />
+        <div class="form-grid">
+          <label class="field"><span>Tipo</span><input id="reservationType" placeholder="Hospedagem" required /></label>
+          <label class="field"><span>Nome</span><input id="reservationName" required /></label>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>Empresa</span><input id="reservationCompany" /></label>
+          <label class="field"><span>Codigo</span><input id="reservationCode" /></label>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>Inicio</span><input id="reservationStart" type="datetime-local" /></label>
+          <label class="field"><span>Fim</span><input id="reservationEnd" type="datetime-local" /></label>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>Valor</span><input id="reservationAmount" type="number" min="0" step="0.01" /></label>
+          <label class="field"><span>Moeda</span><select id="reservationCurrency"><option>BRL</option><option>EUR</option><option>USD</option><option>GBP</option></select></label>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>Pagamento</span><select id="reservationPaymentStatus"><option>Pendente</option><option>Pago</option><option>Parcial</option><option>Cancelado</option></select></label>
+          <label class="field"><span>Status reserva</span><select id="reservationStatus"><option>Planejada</option><option>Confirmada</option><option>Pendente</option><option>Cancelada</option></select></label>
+        </div>
+        <label class="field"><span>Local</span><input id="reservationLocation" /></label>
+        <label class="field"><span>Observacoes</span><textarea id="reservationNotes" rows="3"></textarea></label>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="reservationDialog">Cancelar</button>
+          <button class="primary-button" type="submit">Salvar reserva</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="itineraryDialog">
+      <form class="modal-body" id="itineraryForm" method="dialog">
+        <div class="modal-header">
+          <div><p class="eyebrow">Roteiro</p><h2>Atividade</h2></div>
+          <button class="icon-button" type="button" data-close-dialog="itineraryDialog" title="Fechar" aria-label="Fechar"><i data-lucide="x"></i></button>
+        </div>
+        <input type="hidden" id="itineraryId" />
+        <div class="form-grid">
+          <label class="field"><span>Data</span><input id="itineraryDate" type="date" required /></label>
+          <label class="field"><span>Cidade</span><input id="itineraryCity" /></label>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>Inicio</span><input id="itineraryStart" type="time" /></label>
+          <label class="field"><span>Fim</span><input id="itineraryEnd" type="time" /></label>
+        </div>
+        <label class="field"><span>Titulo</span><input id="itineraryTitle" required /></label>
+        <label class="field"><span>Local</span><input id="itineraryLocation" /></label>
+        <label class="field"><span>Descricao</span><textarea id="itineraryDescription" rows="3"></textarea></label>
+        <div class="modal-actions"><button class="ghost-button" type="button" data-close-dialog="itineraryDialog">Cancelar</button><button class="primary-button" type="submit">Salvar atividade</button></div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="checklistDialog">
+      <form class="modal-body" id="checklistForm" method="dialog">
+        <div class="modal-header">
+          <div><p class="eyebrow">Checklist</p><h2>Item</h2></div>
+          <button class="icon-button" type="button" data-close-dialog="checklistDialog" title="Fechar" aria-label="Fechar"><i data-lucide="x"></i></button>
+        </div>
+        <input type="hidden" id="checklistId" />
+        <div class="form-grid">
+          <label class="field"><span>Categoria</span><input id="checklistCategory" placeholder="Documentos" required /></label>
+          <label class="field"><span>Responsavel</span><select id="checklistAssignedTo"></select></label>
+        </div>
+        <label class="field"><span>Descricao</span><input id="checklistDescription" required /></label>
+        <div class="form-grid">
+          <label class="field"><span>Prazo</span><input id="checklistDueDate" type="date" /></label>
+          <label class="field"><span>Prioridade</span><select id="checklistPriority"><option>Media</option><option>Alta</option><option>Baixa</option></select></label>
+        </div>
+        <label class="field inline-check"><input id="checklistCompleted" type="checkbox" /><span>Concluido</span></label>
+        <label class="field"><span>Observacoes</span><textarea id="checklistNotes" rows="3"></textarea></label>
+        <div class="modal-actions"><button class="ghost-button" type="button" data-close-dialog="checklistDialog">Cancelar</button><button class="primary-button" type="submit">Salvar item</button></div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="documentDialog">
+      <form class="modal-body" id="documentForm" method="dialog">
+        <div class="modal-header">
+          <div><p class="eyebrow">Documento</p><h2>Registro</h2></div>
+          <button class="icon-button" type="button" data-close-dialog="documentDialog" title="Fechar" aria-label="Fechar"><i data-lucide="x"></i></button>
+        </div>
+        <input type="hidden" id="documentId" />
+        <div class="form-grid">
+          <label class="field"><span>Tipo</span><input id="documentType" placeholder="Passaporte" required /></label>
+          <label class="field"><span>Responsavel</span><select id="documentTraveler"></select></label>
+        </div>
+        <label class="field"><span>Nome</span><input id="documentName" required /></label>
+        <label class="field"><span>Numero mascarado</span><input id="documentMaskedNumber" placeholder="***1234" /></label>
+        <div class="form-grid">
+          <label class="field"><span>Emissao</span><input id="documentIssueDate" type="date" /></label>
+          <label class="field"><span>Validade</span><input id="documentExpirationDate" type="date" /></label>
+        </div>
+        <label class="field"><span>Observacoes</span><textarea id="documentNotes" rows="3"></textarea></label>
+        <div class="modal-actions"><button class="ghost-button" type="button" data-close-dialog="documentDialog">Cancelar</button><button class="primary-button" type="submit">Salvar documento</button></div>
+      </form>
+    </dialog>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./viagens.js"></script>
+  </body>
+</html>
