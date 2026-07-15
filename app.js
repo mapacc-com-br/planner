@@ -41,6 +41,7 @@ let categories = [...DEFAULT_CATEGORIES];
 let bills = [];
 let billOccurrences = [];
 let revenues = [];
+let financialGoal = null;
 let selectedMonth = localStorage.getItem(STORAGE_KEYS.selectedMonth) || monthKey(new Date());
 let currentActor = localStorage.getItem(STORAGE_KEYS.actor) || "Andre";
 let ownerFilter = localStorage.getItem(STORAGE_KEYS.ownerFilter) || "Todos";
@@ -51,6 +52,8 @@ let recurrenceScopeResolver = null;
 
 const elements = {
   summaryGrid: document.querySelector("#summaryGrid"),
+  financialGoalStrip: document.querySelector("#financialGoalStrip"),
+  monthlyCheckin: document.querySelector("#monthlyCheckin"),
   urgentList: document.querySelector("#urgentList"),
   urgentCount: document.querySelector("#urgentCount"),
   paidList: document.querySelector("#paidList"),
@@ -132,6 +135,11 @@ function bindEvents() {
   });
 
   document.addEventListener("click", async (event) => {
+    const quickActionButton = event.target.closest("[data-quick-action]");
+    if (quickActionButton?.dataset.quickAction === "bill") openBillDialog();
+    if (quickActionButton?.dataset.quickAction === "revenue") openRevenueDialog();
+    if (quickActionButton) return;
+
     const actionButton = event.target.closest("[data-action]");
     if (!actionButton) return;
 
@@ -219,6 +227,7 @@ function applyState(state) {
   bills = Array.isArray(state.bills) ? state.bills : [];
   billOccurrences = Array.isArray(state.billOccurrences) ? state.billOccurrences : [];
   revenues = Array.isArray(state.revenues) ? state.revenues : [];
+  financialGoal = state.financialGoal || null;
   categories = Array.isArray(state.categories) && state.categories.length ? state.categories : [...DEFAULT_CATEGORIES];
   populateCategoryOptions();
 }
@@ -245,6 +254,8 @@ async function recoverLocalSnapshot() {
 
 function renderLoading() {
   elements.summaryGrid.innerHTML = "";
+  elements.financialGoalStrip.innerHTML = "";
+  elements.monthlyCheckin.innerHTML = "";
   elements.urgentList.innerHTML = emptyTemplate("Carregando dados do SQLite...");
   elements.paidList.innerHTML = emptyTemplate("Carregando pagamentos...");
   elements.allBillsList.innerHTML = emptyTemplate("Carregando contas...");
@@ -255,6 +266,8 @@ function renderLoading() {
 function renderFatalError(error) {
   const message = error.message || "Nao foi possivel abrir o banco de dados.";
   elements.summaryGrid.innerHTML = "";
+  elements.financialGoalStrip.innerHTML = "";
+  elements.monthlyCheckin.innerHTML = "";
   elements.urgentList.innerHTML = emptyTemplate(message);
   elements.paidList.innerHTML = emptyTemplate(message);
   elements.allBillsList.innerHTML = emptyTemplate(message);
@@ -269,6 +282,8 @@ function render() {
   renderActorSwitch();
   renderOwnerFilter();
   renderSummary();
+  renderFinancialGoal();
+  renderMonthlyCheckin();
   renderUrgentList();
   renderPaidList();
   renderAllBills();
@@ -326,6 +341,104 @@ function renderSummary() {
       `,
     )
     .join("");
+}
+
+function renderFinancialGoal() {
+  if (!financialGoal) {
+    elements.financialGoalStrip.innerHTML = "";
+    return;
+  }
+
+  const metrics = calculateGoalMetrics(financialGoal);
+  elements.financialGoalStrip.innerHTML = `
+    <div class="goal-strip">
+      <div class="goal-strip-main">
+        <div class="goal-strip-heading">
+          <span class="goal-icon"><i data-lucide="target"></i></span>
+          <div>
+            <p class="eyebrow">Rumo a ${currency.format(financialGoal.targetAmount)}</p>
+            <h3>${escapeHtml(financialGoal.name)}</h3>
+          </div>
+        </div>
+        <div class="goal-progress" role="progressbar" aria-label="Progresso da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(metrics.progress)}">
+          <span style="--goal-progress: ${metrics.progress}%;"></span>
+        </div>
+        <div class="goal-progress-labels">
+          <strong>${currency.format(financialGoal.currentAmount)}</strong>
+          <span>${metrics.progress.toFixed(1).replace(".", ",")}% da meta</span>
+        </div>
+      </div>
+      <div class="goal-strip-side">
+        <div>
+          <span>Ritmo necessario</span>
+          <strong>${currency.format(metrics.requiredMonthly)} / mes</strong>
+        </div>
+        <a class="compact-button" href="./patrimonio.html">
+          <i data-lucide="arrow-up-right"></i>
+          Abrir meta
+        </a>
+      </div>
+    </div>
+  `;
+}
+
+function renderMonthlyCheckin() {
+  const monthBills = getVisibleMonthBills();
+  const monthRevenues = getVisibleMonthRevenues();
+  const totalIncome = sum(monthRevenues, "amount");
+  const totalBills = sum(monthBills, "amount");
+  const totalPaid = monthBills.reduce((total, bill) => total + (bill.paid ? Number(bill.paidAmount || bill.amount) : 0), 0);
+  const available = totalIncome - totalBills;
+  const commitment = totalIncome > 0 ? (totalBills / totalIncome) * 100 : 0;
+  const paymentProgress = totalBills > 0 ? (totalPaid / totalBills) * 100 : 0;
+  const overdue = monthBills.filter((bill) => !bill.paid && statusForBill(bill).tone === "overdue");
+  const overdueAmount = sum(overdue, "amount");
+
+  elements.monthlyCheckin.innerHTML = `
+    <div class="checkin-panel">
+      <div class="checkin-header">
+        <div>
+          <p class="eyebrow">Check-in do casal</p>
+          <h3>O que o mes esta dizendo</h3>
+        </div>
+        <div class="checkin-actions">
+          <button class="compact-button" data-quick-action="revenue">
+            <i data-lucide="wallet-cards"></i>
+            Receita
+          </button>
+          <button class="compact-button" data-quick-action="bill">
+            <i data-lucide="plus"></i>
+            Conta
+          </button>
+        </div>
+      </div>
+      <div class="checkin-grid">
+        <div class="checkin-metric ${available < 0 ? "is-alert" : "is-positive"}">
+          <span>Depois das contas</span>
+          <strong>${currency.format(available)}</strong>
+          <small>${available < 0 ? "Orcamento acima da renda" : "Disponivel no previsto"}</small>
+        </div>
+        <div class="checkin-metric ${commitment > 80 ? "is-alert" : ""}">
+          <span>Renda comprometida</span>
+          <strong>${Math.round(commitment)}%</strong>
+          <small>${currency.format(totalBills)} em contas</small>
+        </div>
+        <div class="checkin-metric">
+          <span>Pagamentos concluidos</span>
+          <strong>${Math.round(paymentProgress)}%</strong>
+          <small>${currency.format(totalPaid)} pago</small>
+        </div>
+      </div>
+      <div class="checkin-status ${overdue.length ? "is-alert" : "is-clear"}">
+        <i data-lucide="${overdue.length ? "circle-alert" : "circle-check"}"></i>
+        <span>${
+          overdue.length
+            ? `${overdue.length} ${overdue.length === 1 ? "conta atrasada" : "contas atrasadas"}, somando ${currency.format(overdueAmount)}.`
+            : "Nenhuma conta atrasada neste recorte."
+        }</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderUrgentList() {
@@ -1085,6 +1198,24 @@ function findRevenue(id) {
 
 function sum(items, key) {
   return items.reduce((total, item) => total + Number(item[key] || 0), 0);
+}
+
+function calculateGoalMetrics(goal) {
+  const target = dateFromKey(goal.targetDate);
+  target.setHours(23, 59, 59, 999);
+  const now = new Date();
+  const daysRemaining = Math.max(Math.ceil((target.getTime() - now.getTime()) / DAY_MS), 0);
+  const monthsRemaining = Math.max(daysRemaining / 30.4375, 0.01);
+  const gap = Math.max(Number(goal.targetAmount) - Number(goal.currentAmount), 0);
+
+  return {
+    gap,
+    daysRemaining,
+    monthsRemaining,
+    progress: goal.targetAmount ? Math.min((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100, 100) : 0,
+    requiredMonthly: gap / monthsRemaining,
+    projectedAmount: Number(goal.currentAmount) + Number(goal.monthlyContribution || 0) * monthsRemaining,
+  };
 }
 
 function monthKey(date) {

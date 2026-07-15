@@ -1030,6 +1030,285 @@ h3 {
   font-size: 0.9rem;
 }
 
+#financialGoalStrip,
+#monthlyCheckin,
+#financialGoalPanel {
+  margin-bottom: 18px;
+}
+
+.goal-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.42fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.goal-strip-main,
+.goal-strip-side {
+  padding: 18px 20px;
+}
+
+.goal-strip-heading,
+.goal-strip-side,
+.financial-goal-header,
+.checkin-header,
+.checkin-actions,
+.goal-status-line,
+.goal-amount-line {
+  display: flex;
+  align-items: center;
+}
+
+.goal-strip-heading,
+.financial-goal-header,
+.checkin-header {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.goal-strip-heading {
+  justify-content: flex-start;
+}
+
+.goal-strip-heading h3,
+.checkin-header h3,
+.financial-goal-header h2 {
+  margin: 2px 0 0;
+}
+
+.goal-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  color: var(--green);
+  border-radius: 8px;
+  background: var(--green-soft);
+}
+
+.goal-progress {
+  overflow: hidden;
+  height: 8px;
+  margin-top: 16px;
+  border-radius: 999px;
+  background: #e5edf5;
+}
+
+.goal-progress.large {
+  height: 12px;
+  margin-top: 20px;
+}
+
+.goal-progress > span {
+  display: block;
+  width: min(var(--goal-progress), 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.goal-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.goal-progress-labels strong {
+  color: var(--text);
+}
+
+.goal-strip-side {
+  justify-content: space-between;
+  gap: 20px;
+  border-left: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.goal-strip-side span,
+.goal-metric span,
+.checkin-metric span,
+.goal-current-label,
+.goal-form-preview span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.goal-strip-side strong,
+.goal-metric strong,
+.checkin-metric strong,
+.goal-form-preview strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.goal-strip-side strong {
+  white-space: nowrap;
+}
+
+.checkin-panel,
+.financial-goal-panel {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.checkin-header,
+.financial-goal-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.checkin-actions {
+  gap: 8px;
+}
+
+.checkin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.checkin-metric {
+  min-width: 0;
+  padding: 18px 20px;
+  border-left: 1px solid var(--line);
+}
+
+.checkin-metric:first-child {
+  border-left: 0;
+}
+
+.checkin-metric strong {
+  color: var(--blue-deep);
+  font-size: 1.45rem;
+}
+
+.checkin-metric.is-positive strong,
+.positive-text {
+  color: var(--green);
+}
+
+.checkin-metric.is-alert strong,
+.negative-text {
+  color: var(--red);
+}
+
+.checkin-metric small,
+.goal-metric small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+}
+
+.checkin-status,
+.goal-guidance {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+.checkin-status.is-clear,
+.goal-guidance.is-positive {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.checkin-status.is-alert,
+.goal-guidance.is-attention {
+  color: #8f6119;
+  background: var(--amber-soft);
+}
+
+.financial-goal-header {
+  align-items: flex-start;
+}
+
+.goal-status-line {
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.financial-goal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+  gap: 28px;
+  padding: 24px 20px;
+}
+
+.goal-amount-line {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.goal-amount-line strong {
+  font-size: 2.35rem;
+  line-height: 1;
+}
+
+.goal-amount-line span {
+  color: var(--muted);
+}
+
+.financial-goal-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.goal-metric {
+  min-width: 0;
+  padding: 16px;
+  border-left: 1px solid var(--line);
+}
+
+.goal-metric:first-child {
+  border-left: 0;
+}
+
+.goal-metric strong {
+  overflow-wrap: anywhere;
+  color: var(--blue-deep);
+  font-size: 1.05rem;
+}
+
+.goal-form-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--line);
+}
+
+.goal-form-preview:empty {
+  display: none;
+}
+
+.goal-form-preview > div {
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface-soft);
+}
+
 .dense .bill-row {
   grid-template-columns: minmax(0, 1fr) auto;
 }
@@ -1279,6 +1558,19 @@ h3 {
   .ledger-grid {
     grid-template-columns: 1fr;
   }
+
+  .financial-goal-body {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-strip-side {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1340,6 +1632,7 @@ h3 {
   .topbar,
   .month-strip,
   .panel-header,
+  .financial-goal-header,
   .modal-header,
   .modal-actions {
     align-items: stretch;
@@ -1394,12 +1687,66 @@ h3 {
     width: 100%;
   }
 
-  .summary-grid,
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .summary-card {
+    min-height: 118px;
+    padding: 14px;
+  }
+
+  .summary-card:nth-child(odd):last-child {
+    grid-column: 1 / -1;
+  }
+
+  .summary-card strong {
+    overflow-wrap: anywhere;
+    font-size: 1.16rem;
+  }
+
   .form-grid,
+  .goal-strip,
+  .checkin-grid,
+  .financial-goal-metrics,
+  .goal-form-preview,
   .travel-layout,
   .travel-insight-grid,
   .mini-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .goal-strip-side {
+    align-items: stretch;
+    flex-direction: column;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .checkin-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .checkin-actions > button {
+    width: 100%;
+  }
+
+  .checkin-metric,
+  .goal-metric {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .checkin-metric:first-child,
+  .goal-metric:first-child {
+    border-top: 0;
+  }
+
+  .goal-amount-line strong {
+    font-size: 1.9rem;
   }
 
 .bill-row,

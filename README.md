@@ -65,6 +65,7 @@ Tabelas principais:
 - `bills`
 - `revenues`
 - `assets`
+- `financial_goals`
 - `card_statements`
 - `card_transactions`
 - `trips`
@@ -77,6 +78,17 @@ Tabelas principais:
 - `trip_itinerary_items`
 - `trip_checklist_items`
 - `trip_documents`
+
+## Meta patrimonial
+
+A area de patrimonio acompanha uma meta separada do total de bens cadastrados. O ponto inicial configurado e:
+
+- saldo acompanhado de R$ 110 mil;
+- meta de R$ 250 mil;
+- data final em 31/12/2026;
+- aporte mensal planejado de R$ 25 mil.
+
+O Planner calcula automaticamente o ritmo mensal necessario, a projecao para a data e a diferenca entre o aporte planejado e o aporte exigido. A meta tambem aparece no painel mensal junto do check-in do casal.
 
 ## Viagens
 

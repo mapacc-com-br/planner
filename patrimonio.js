@@ -3,9 +3,17 @@ const currency = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const shortDateFormatter = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
   month: "2-digit",
+  year: "numeric",
+});
+
+const goalDateFormatter = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "short",
   year: "numeric",
 });
 
@@ -19,16 +27,21 @@ const assetTypes = [
 ];
 
 let assets = [];
+let financialGoal = null;
 let toastTimer = null;
 
 const elements = {
   summary: document.querySelector("#patrimonySummary"),
+  financialGoalPanel: document.querySelector("#financialGoalPanel"),
   assetList: document.querySelector("#assetList"),
   assetTypeMap: document.querySelector("#assetTypeMap"),
   liquidityMap: document.querySelector("#liquidityMap"),
   assetDialog: document.querySelector("#assetDialog"),
   assetForm: document.querySelector("#assetForm"),
   assetDialogTitle: document.querySelector("#assetDialogTitle"),
+  financialGoalDialog: document.querySelector("#financialGoalDialog"),
+  financialGoalForm: document.querySelector("#financialGoalForm"),
+  financialGoalFormPreview: document.querySelector("#financialGoalFormPreview"),
   toast: document.querySelector("#toast"),
   logoutButton: document.querySelector("#logoutButton"),
 };
@@ -67,6 +80,7 @@ function bindEvents() {
 
     const id = button.closest("[data-id]")?.dataset.id;
     try {
+      if (button.dataset.action === "edit-financial-goal") openFinancialGoalDialog();
       if (button.dataset.action === "edit-asset") openAssetDialog(findAsset(id));
       if (button.dataset.action === "delete-asset") await deleteAsset(id);
     } catch (error) {
@@ -75,15 +89,21 @@ function bindEvents() {
   });
 
   elements.assetForm.addEventListener("submit", saveAssetFromForm);
+  elements.financialGoalForm.addEventListener("submit", saveFinancialGoalFromForm);
+  ["financialGoalCurrentAmount", "financialGoalTargetAmount", "financialGoalMonthlyContribution", "financialGoalTargetDate"].forEach((id) => {
+    document.querySelector(`#${id}`).addEventListener("input", renderFinancialGoalFormPreview);
+  });
 }
 
 async function refreshAssets() {
   const state = await apiRequest("/api/patrimony");
   assets = Array.isArray(state.assets) ? state.assets : [];
+  financialGoal = state.goal || null;
 }
 
 function renderLoading() {
   elements.summary.innerHTML = "";
+  elements.financialGoalPanel.innerHTML = "";
   elements.assetList.innerHTML = emptyTemplate("Carregando patrimonio...");
   elements.assetTypeMap.innerHTML = emptyTemplate("Carregando tipos...");
   elements.liquidityMap.innerHTML = emptyTemplate("Carregando liquidez...");
@@ -91,6 +111,7 @@ function renderLoading() {
 
 function renderError(error) {
   const message = error.message || "Nao foi possivel carregar o patrimonio.";
+  elements.financialGoalPanel.innerHTML = emptyTemplate(message);
   elements.assetList.innerHTML = emptyTemplate(message);
   elements.assetTypeMap.innerHTML = emptyTemplate(message);
   elements.liquidityMap.innerHTML = emptyTemplate(message);
@@ -98,6 +119,7 @@ function renderError(error) {
 }
 
 function render() {
+  renderFinancialGoal();
   renderSummary();
   renderAssetTypeMap();
   renderLiquidityMap();
@@ -106,6 +128,79 @@ function render() {
   if (window.lucide) {
     window.lucide.createIcons();
   }
+}
+
+function renderFinancialGoal() {
+  if (!financialGoal) {
+    elements.financialGoalPanel.innerHTML = emptyTemplate("Nenhuma meta financeira configurada.");
+    return;
+  }
+
+  const metrics = calculateGoalMetrics(financialGoal);
+  const monthlyDifference = Number(financialGoal.monthlyContribution) - metrics.requiredMonthly;
+  const onTrack = monthlyDifference >= 0;
+
+  elements.financialGoalPanel.innerHTML = `
+    <div class="financial-goal-panel">
+      <div class="financial-goal-header">
+        <div>
+          <div class="goal-status-line">
+            <span class="status-pill ${onTrack ? "status-paid" : "status-due-soon"}">${onTrack ? "No ritmo" : "Meta desafio"}</span>
+            <span>Ate ${formatGoalDate(financialGoal.targetDate)}</span>
+          </div>
+          <p class="eyebrow">Objetivo do casal</p>
+          <h2>${escapeHtml(financialGoal.name)}</h2>
+        </div>
+        <button class="icon-button" data-action="edit-financial-goal" title="Editar meta" aria-label="Editar meta">
+          <i data-lucide="pencil"></i>
+        </button>
+      </div>
+
+      <div class="financial-goal-body">
+        <div class="financial-goal-progress-area">
+          <span class="goal-current-label">Saldo acompanhado</span>
+          <div class="goal-amount-line">
+            <strong>${currency.format(financialGoal.currentAmount)}</strong>
+            <span>de ${currency.format(financialGoal.targetAmount)}</span>
+          </div>
+          <div class="goal-progress large" role="progressbar" aria-label="Progresso da meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(metrics.progress)}">
+            <span style="--goal-progress: ${metrics.progress}%;"></span>
+          </div>
+          <div class="goal-progress-labels">
+            <span>${metrics.progress.toFixed(1).replace(".", ",")}% concluido</span>
+            <span>Faltam ${currency.format(metrics.gap)}</span>
+          </div>
+        </div>
+
+        <div class="financial-goal-metrics">
+          <div class="goal-metric">
+            <span>Necessario por mes</span>
+            <strong>${currency.format(metrics.requiredMonthly)}</strong>
+            <small>sem contar rendimentos</small>
+          </div>
+          <div class="goal-metric">
+            <span>Aporte planejado</span>
+            <strong>${currency.format(financialGoal.monthlyContribution)}</strong>
+            <small>${onTrack ? "cobre o ritmo" : `faltam ${currency.format(Math.abs(monthlyDifference))} / mes`}</small>
+          </div>
+          <div class="goal-metric">
+            <span>Projecao na data</span>
+            <strong>${currency.format(metrics.projectedAmount)}</strong>
+            <small>${metrics.daysRemaining} dias restantes</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="goal-guidance ${onTrack ? "is-positive" : "is-attention"}">
+        <i data-lucide="${onTrack ? "circle-check" : "gauge"}"></i>
+        <span>${
+          onTrack
+            ? `O plano tem margem mensal de ${currency.format(monthlyDifference)} para a meta.`
+            : `R$ 250 mil e uma meta agressiva: o plano precisa ganhar ${currency.format(Math.abs(monthlyDifference))} por mes em economia, renda extra ou aporte extraordinario.`
+        }</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderSummary() {
@@ -230,6 +325,69 @@ function barMapTemplate(items, emptyMessage) {
     .join("");
 }
 
+function openFinancialGoalDialog() {
+  if (!financialGoal) return;
+
+  document.querySelector("#financialGoalId").value = financialGoal.id;
+  document.querySelector("#financialGoalName").value = financialGoal.name;
+  document.querySelector("#financialGoalCurrentAmount").value = financialGoal.currentAmount;
+  document.querySelector("#financialGoalTargetAmount").value = financialGoal.targetAmount;
+  document.querySelector("#financialGoalMonthlyContribution").value = financialGoal.monthlyContribution;
+  document.querySelector("#financialGoalTargetDate").value = financialGoal.targetDate;
+  renderFinancialGoalFormPreview();
+  elements.financialGoalDialog.showModal();
+}
+
+function renderFinancialGoalFormPreview() {
+  const draft = financialGoalDraftFromForm();
+  if (!draft.targetDate || !Number.isFinite(draft.currentAmount) || !Number.isFinite(draft.targetAmount) || draft.targetAmount <= 0) {
+    elements.financialGoalFormPreview.innerHTML = "";
+    return;
+  }
+
+  const metrics = calculateGoalMetrics(draft);
+  const difference = draft.monthlyContribution - metrics.requiredMonthly;
+  elements.financialGoalFormPreview.innerHTML = `
+    <div>
+      <span>Falta acumular</span>
+      <strong>${currency.format(metrics.gap)}</strong>
+    </div>
+    <div>
+      <span>Ritmo necessario</span>
+      <strong>${currency.format(metrics.requiredMonthly)} / mes</strong>
+    </div>
+    <div>
+      <span>Folga ou falta</span>
+      <strong class="${difference >= 0 ? "positive-text" : "negative-text"}">${difference >= 0 ? "+" : "-"}${currency.format(Math.abs(difference))}</strong>
+    </div>
+  `;
+}
+
+function financialGoalDraftFromForm() {
+  return {
+    id: document.querySelector("#financialGoalId").value || "patrimony-2026",
+    name: document.querySelector("#financialGoalName").value.trim(),
+    currentAmount: Number(document.querySelector("#financialGoalCurrentAmount").value),
+    targetAmount: Number(document.querySelector("#financialGoalTargetAmount").value),
+    monthlyContribution: Number(document.querySelector("#financialGoalMonthlyContribution").value),
+    targetDate: document.querySelector("#financialGoalTargetDate").value,
+  };
+}
+
+async function saveFinancialGoalFromForm(event) {
+  event.preventDefault();
+
+  try {
+    const result = await apiRequest("/api/financial-goal", { method: "POST", body: financialGoalDraftFromForm() });
+    financialGoal = result.goal;
+    elements.financialGoalDialog.close();
+    render();
+    showToast("Meta financeira atualizada.");
+  } catch (error) {
+    showToast(error.message || "Nao foi possivel salvar a meta.");
+  }
+}
+
 function openAssetDialog(asset = null) {
   elements.assetForm.reset();
   elements.assetDialogTitle.textContent = asset ? "Editar item" : "Novo item";
@@ -328,6 +486,23 @@ function sum(items, key) {
   return items.reduce((value, item) => value + Number(item[key] || 0), 0);
 }
 
+function calculateGoalMetrics(goal) {
+  const [year, month, day] = goal.targetDate.split("-").map(Number);
+  const target = new Date(year, month - 1, day, 23, 59, 59, 999);
+  const daysRemaining = Math.max(Math.ceil((target.getTime() - Date.now()) / DAY_MS), 0);
+  const monthsRemaining = Math.max(daysRemaining / 30.4375, 0.01);
+  const gap = Math.max(Number(goal.targetAmount) - Number(goal.currentAmount), 0);
+
+  return {
+    gap,
+    daysRemaining,
+    monthsRemaining,
+    progress: goal.targetAmount ? Math.min((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100, 100) : 0,
+    requiredMonthly: gap / monthsRemaining,
+    projectedAmount: Number(goal.currentAmount) + Number(goal.monthlyContribution || 0) * monthsRemaining,
+  };
+}
+
 function createId() {
   return window.crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -340,6 +515,11 @@ function todayKey() {
 function formatShortDate(key) {
   const [year, month, day] = key.split("-").map(Number);
   return shortDateFormatter.format(new Date(year, month - 1, day));
+}
+
+function formatGoalDate(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return goalDateFormatter.format(new Date(year, month - 1, day)).replace(".", "");
 }
 
 function emptyTemplate(message) {

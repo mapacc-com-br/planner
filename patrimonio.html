@@ -84,6 +84,8 @@
           </div>
         </header>
 
+        <section id="financialGoalPanel" aria-label="Meta patrimonial do casal"></section>
+
         <section class="summary-grid" id="patrimonySummary" aria-label="Resumo do patrimonio"></section>
 
         <section class="focus-grid">
@@ -218,6 +220,59 @@
           <button class="primary-button" type="submit">
             <i data-lucide="save"></i>
             Salvar item
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="financialGoalDialog">
+      <form class="modal-body" id="financialGoalForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Objetivo do casal</p>
+            <h2>Planejar meta</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="financialGoalDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="financialGoalId" />
+
+        <label class="field">
+          <span>Nome da meta</span>
+          <input id="financialGoalName" type="text" placeholder="Meta 250 mil" required />
+        </label>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Saldo acompanhado</span>
+            <input id="financialGoalCurrentAmount" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Valor da meta</span>
+            <input id="financialGoalTargetAmount" type="number" min="0.01" step="0.01" required />
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Aporte mensal planejado</span>
+            <input id="financialGoalMonthlyContribution" type="number" min="0" step="0.01" required />
+          </label>
+          <label class="field">
+            <span>Data final</span>
+            <input id="financialGoalTargetDate" type="date" required />
+          </label>
+        </div>
+
+        <div class="goal-form-preview" id="financialGoalFormPreview"></div>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="financialGoalDialog">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Salvar meta
           </button>
         </div>
       </form>

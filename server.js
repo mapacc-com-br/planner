@@ -189,6 +189,13 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (method === "POST" && url.pathname === "/api/financial-goal") {
+    const goal = normalizeFinancialGoal(await readJson(request));
+    upsertFinancialGoal(goal);
+    sendJson(response, 200, { goal: getFinancialGoal() });
+    return;
+  }
+
   if (method === "POST" && url.pathname === "/api/assets") {
     const asset = normalizeAsset(await readJson(request));
     upsertAsset(asset);
@@ -515,6 +522,17 @@ function initializeDatabase() {
     create index if not exists idx_assets_type on assets(asset_type);
     create index if not exists idx_assets_value on assets(current_value_cents);
 
+    create table if not exists financial_goals (
+      id text primary key,
+      workspace_id text not null default 'home' references workspaces(id) on delete cascade,
+      name text not null check (length(trim(name)) > 0),
+      current_amount_cents integer not null check (current_amount_cents >= 0),
+      target_amount_cents integer not null check (target_amount_cents > 0),
+      target_date text not null check (target_date glob '????-??-??'),
+      monthly_contribution_cents integer not null default 0 check (monthly_contribution_cents >= 0),
+      updated_at text not null default (datetime('now'))
+    );
+
     create table if not exists card_statements (
       id text primary key,
       workspace_id text not null default 'home' references workspaces(id) on delete cascade,
@@ -736,6 +754,14 @@ function initializeDatabase() {
       update assets set updated_at = datetime('now') where id = new.id;
     end;
 
+    create trigger if not exists financial_goals_updated_at
+    after update on financial_goals
+    for each row
+    when old.updated_at = new.updated_at
+    begin
+      update financial_goals set updated_at = datetime('now') where id = new.id;
+    end;
+
     create trigger if not exists bill_occurrences_updated_at
     after update on bill_occurrences
     for each row
@@ -817,6 +843,11 @@ function initializeDatabase() {
     db.prepare("insert or ignore into workspaces (id, name) values (?, ?)").run("home", "Casa");
     db.prepare("insert or ignore into workspace_users (workspace_id, user_id, role) values (?, ?, ?)").run("home", "andre", "owner");
     db.prepare("insert or ignore into workspace_users (workspace_id, user_id, role) values (?, ?, ?)").run("home", "luciana", "owner");
+    db.prepare(
+      `insert or ignore into financial_goals (
+        id, workspace_id, name, current_amount_cents, target_amount_cents, target_date, monthly_contribution_cents
+      ) values ('patrimony-2026', 'home', 'Meta 250 mil', 11000000, 25000000, '2026-12-31', 2500000)`,
+    ).run();
 
     const categoryStmt = db.prepare(`
       insert into categories (name, color)
@@ -856,6 +887,7 @@ function getState() {
       .all()
       .map(rowToRevenue),
     categories: db.prepare("select name, color from categories order by rowid asc").all(),
+    financialGoal: getFinancialGoal(),
   };
 }
 
@@ -870,7 +902,23 @@ function getPatrimonyState() {
       )
       .all()
       .map(rowToAsset),
+    goal: getFinancialGoal(),
   };
+}
+
+function getFinancialGoal() {
+  const row = db
+    .prepare(
+      `select id, name, current_amount_cents, target_amount_cents, target_date,
+              monthly_contribution_cents, updated_at
+         from financial_goals
+        where workspace_id = 'home'
+        order by updated_at desc
+        limit 1`,
+    )
+    .get();
+
+  return row ? rowToFinancialGoal(row) : null;
 }
 
 function getCardStatementsState() {
@@ -1686,6 +1734,27 @@ function upsertAsset(asset) {
   );
 }
 
+function upsertFinancialGoal(goal) {
+  db.prepare(
+    `insert into financial_goals (
+      id, workspace_id, name, current_amount_cents, target_amount_cents, target_date, monthly_contribution_cents
+    ) values (?, 'home', ?, ?, ?, ?, ?)
+    on conflict(id) do update set
+      name = excluded.name,
+      current_amount_cents = excluded.current_amount_cents,
+      target_amount_cents = excluded.target_amount_cents,
+      target_date = excluded.target_date,
+      monthly_contribution_cents = excluded.monthly_contribution_cents`,
+  ).run(
+    goal.id,
+    goal.name,
+    toCents(goal.currentAmount),
+    toCents(goal.targetAmount),
+    goal.targetDate,
+    toCents(goal.monthlyContribution),
+  );
+}
+
 function saveCardStatement(statement) {
   transaction(() => {
     db.prepare(
@@ -1918,6 +1987,27 @@ function normalizeAsset(raw) {
     liquidity: raw.liquidity,
     owner: raw.owner,
     notes: String(raw.notes || "").trim(),
+  };
+}
+
+function normalizeFinancialGoal(raw) {
+  const currentAmount = Number(raw.currentAmount);
+  const targetAmount = Number(raw.targetAmount);
+  const monthlyContribution = Number(raw.monthlyContribution);
+  const targetDate = String(raw.targetDate || "");
+
+  if (!Number.isFinite(currentAmount) || currentAmount < 0) throw new Error("Saldo atual invalido.");
+  if (!Number.isFinite(targetAmount) || targetAmount <= 0) throw new Error("Valor da meta invalido.");
+  if (!Number.isFinite(monthlyContribution) || monthlyContribution < 0) throw new Error("Aporte mensal invalido.");
+  assertDate(targetDate, "targetDate");
+
+  return {
+    id: raw.id || "patrimony-2026",
+    name: cleanText(raw.name, "name"),
+    currentAmount,
+    targetAmount,
+    targetDate,
+    monthlyContribution,
   };
 }
 
@@ -2272,6 +2362,18 @@ function rowToAsset(row) {
     liquidity: row.liquidity,
     owner: row.owner,
     notes: row.notes,
+  };
+}
+
+function rowToFinancialGoal(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    currentAmount: fromCents(row.current_amount_cents),
+    targetAmount: fromCents(row.target_amount_cents),
+    targetDate: row.target_date,
+    monthlyContribution: fromCents(row.monthly_contribution_cents),
+    updatedAt: row.updated_at,
   };
 }
 
