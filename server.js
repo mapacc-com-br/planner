@@ -12,7 +12,7 @@ const port = Number(process.env.PORT || process.argv[2] || 80);
 const host = process.env.RAILWAY_ENVIRONMENT_ID ? "0.0.0.0" : process.env.HOST || "127.0.0.1";
 const sessionCookieName = "planner_session";
 const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
-const authConfig = loadAuthConfig();
+const authConfig = process.env.PLANNER_DISABLE_AUTH === "1" ? null : loadAuthConfig();
 const sessions = new Map();
 
 fs.mkdirSync(dataDir, { recursive: true });
@@ -74,7 +74,8 @@ const server = http.createServer(async (request, response) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Planner financeiro running at http://localhost${port === 80 ? "" : `:${port}`}`);
+  const listeningPort = server.address()?.port || port;
+  console.log(`Planner financeiro running at http://localhost${listeningPort === 80 ? "" : `:${listeningPort}`}`);
   console.log(`SQLite database: ${dbPath}`);
 });
 
@@ -93,6 +94,7 @@ async function handleApi(request, response, url) {
       billOccurrences: db.prepare("select count(*) as count from bill_occurrences").get().count,
       revenues: db.prepare("select count(*) as count from revenues").get().count,
       assets: db.prepare("select count(*) as count from assets").get().count,
+      assetMovements: db.prepare("select count(*) as count from asset_movements").get().count,
       cardStatements: db.prepare("select count(*) as count from card_statements").get().count,
       cardTransactions: db.prepare("select count(*) as count from card_transactions").get().count,
       trips: db.prepare("select count(*) as count from trips").get().count,
@@ -200,6 +202,19 @@ async function handleApi(request, response, url) {
     const asset = normalizeAsset(await readJson(request));
     upsertAsset(asset);
     sendJson(response, 200, { asset });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/api/asset-movements") {
+    const movement = normalizeAssetMovement(await readJson(request));
+    upsertAssetMovement(movement);
+    sendJson(response, 200, { movement });
+    return;
+  }
+
+  if (method === "DELETE" && parts[1] === "asset-movements" && parts[2]) {
+    db.prepare("delete from asset_movements where id = ?").run(pathParam(parts[2]));
+    sendJson(response, 200, { ok: true });
     return;
   }
 
@@ -514,6 +529,13 @@ function initializeDatabase() {
       reference_date text not null check (reference_date glob '????-??-??'),
       liquidity text not null check (liquidity in ('D0', 'D1', 'Ate 30 dias', 'Longo prazo', 'Nao liquido')),
       owner text not null check (owner in ('Andre', 'Luciana', 'Ambos')),
+      investment_status text not null default 'Ativo' check (investment_status in ('Ativo', 'Encerrado', 'Resgatado', 'Inativo')),
+      start_date text check (start_date is null or start_date glob '????-??-??'),
+      maturity_date text check (maturity_date is null or maturity_date glob '????-??-??'),
+      closed_date text check (closed_date is null or closed_date glob '????-??-??'),
+      return_rate_micros integer,
+      return_rate_period text check (return_rate_period is null or return_rate_period in ('Mensal', 'Anual')),
+      return_type text not null default '',
       notes text not null default '',
       created_at text not null default (datetime('now')),
       updated_at text not null default (datetime('now'))
@@ -521,6 +543,29 @@ function initializeDatabase() {
 
     create index if not exists idx_assets_type on assets(asset_type);
     create index if not exists idx_assets_value on assets(current_value_cents);
+
+    create table if not exists asset_movements (
+      id text primary key,
+      asset_id text not null references assets(id) on delete cascade,
+      movement_type text not null check (movement_type in ('Aporte', 'Resgate')),
+      amount_cents integer not null check (amount_cents > 0),
+      movement_date text not null check (movement_date glob '????-??-??'),
+      notes text not null default '',
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now'))
+    );
+
+    create table if not exists asset_balance_snapshots (
+      asset_id text not null references assets(id) on delete cascade,
+      reference_date text not null check (reference_date glob '????-??-??'),
+      balance_cents integer not null check (balance_cents >= 0),
+      invested_value_cents integer check (invested_value_cents is null or invested_value_cents >= 0),
+      created_at text not null default (datetime('now')),
+      primary key (asset_id, reference_date)
+    );
+
+    create index if not exists idx_asset_movements_asset_date on asset_movements(asset_id, movement_date);
+    create index if not exists idx_asset_snapshots_asset_date on asset_balance_snapshots(asset_id, reference_date);
 
     create table if not exists financial_goals (
       id text primary key,
@@ -754,6 +799,14 @@ function initializeDatabase() {
       update assets set updated_at = datetime('now') where id = new.id;
     end;
 
+    create trigger if not exists asset_movements_updated_at
+    after update on asset_movements
+    for each row
+    when old.updated_at = new.updated_at
+    begin
+      update asset_movements set updated_at = datetime('now') where id = new.id;
+    end;
+
     create trigger if not exists financial_goals_updated_at
     after update on financial_goals
     for each row
@@ -836,6 +889,13 @@ function initializeDatabase() {
   `);
 
   ensureColumn("bills", "recurrence_until", "text check (recurrence_until is null or recurrence_until glob '????-??-??')");
+  ensureColumn("assets", "investment_status", "text not null default 'Ativo' check (investment_status in ('Ativo', 'Encerrado', 'Resgatado', 'Inativo'))");
+  ensureColumn("assets", "start_date", "text check (start_date is null or start_date glob '????-??-??')");
+  ensureColumn("assets", "maturity_date", "text check (maturity_date is null or maturity_date glob '????-??-??')");
+  ensureColumn("assets", "closed_date", "text check (closed_date is null or closed_date glob '????-??-??')");
+  ensureColumn("assets", "return_rate_micros", "integer");
+  ensureColumn("assets", "return_rate_period", "text check (return_rate_period is null or return_rate_period in ('Mensal', 'Anual'))");
+  ensureColumn("assets", "return_type", "text not null default ''");
 
   transaction(() => {
     db.prepare("insert or ignore into users (id, name) values (?, ?)").run("andre", "Andre");
@@ -857,7 +917,12 @@ function initializeDatabase() {
     getDefaultCategories().forEach((category) => categoryStmt.run(category.name, category.color));
   });
 
-  seedDemoTrip();
+  db.prepare(
+    `insert or ignore into asset_balance_snapshots (asset_id, reference_date, balance_cents, invested_value_cents)
+     select id, reference_date, current_value_cents, invested_value_cents from assets`,
+  ).run();
+
+  if (process.env.PLANNER_SEED_DEMO_TRIP === "1") seedDemoTrip();
 }
 
 function getState() {
@@ -892,16 +957,39 @@ function getState() {
 }
 
 function getPatrimonyState() {
+  const assets = db
+    .prepare(
+      `select id, name, asset_type, institution, current_value_cents, invested_value_cents,
+              reference_date, liquidity, owner, investment_status, start_date, maturity_date,
+              closed_date, return_rate_micros, return_rate_period, return_type, notes
+         from assets
+        order by current_value_cents desc, name asc`,
+    )
+    .all()
+    .map(rowToAsset);
+  const movements = db
+    .prepare(
+      `select id, asset_id, movement_type, amount_cents, movement_date, notes
+         from asset_movements
+        order by movement_date asc, created_at asc`,
+    )
+    .all()
+    .map(rowToAssetMovement);
+  const snapshots = db
+    .prepare(
+      `select asset_id, reference_date, balance_cents, invested_value_cents
+         from asset_balance_snapshots
+        order by reference_date asc`,
+    )
+    .all()
+    .map(rowToAssetSnapshot);
+
   return {
-    assets: db
-      .prepare(
-        `select id, name, asset_type, institution, current_value_cents, invested_value_cents,
-                reference_date, liquidity, owner, notes
-           from assets
-          order by current_value_cents desc, name asc`,
-      )
-      .all()
-      .map(rowToAsset),
+    assets: assets.map((asset) => ({
+      ...asset,
+      movements: movements.filter((movement) => movement.assetId === asset.id),
+      snapshots: snapshots.filter((snapshot) => snapshot.assetId === asset.id),
+    })),
     goal: getFinancialGoal(),
   };
 }
@@ -1705,33 +1793,77 @@ function upsertRevenue(revenue) {
 }
 
 function upsertAsset(asset) {
+  transaction(() => {
+    db.prepare(
+      `insert into assets (
+        id, workspace_id, name, asset_type, institution, current_value_cents,
+        invested_value_cents, reference_date, liquidity, owner, investment_status,
+        start_date, maturity_date, closed_date, return_rate_micros, return_rate_period,
+        return_type, notes
+      ) values (?, 'home', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(id) do update set
+        name = excluded.name,
+        asset_type = excluded.asset_type,
+        institution = excluded.institution,
+        current_value_cents = excluded.current_value_cents,
+        invested_value_cents = excluded.invested_value_cents,
+        reference_date = excluded.reference_date,
+        liquidity = excluded.liquidity,
+        owner = excluded.owner,
+        investment_status = excluded.investment_status,
+        start_date = excluded.start_date,
+        maturity_date = excluded.maturity_date,
+        closed_date = excluded.closed_date,
+        return_rate_micros = excluded.return_rate_micros,
+        return_rate_period = excluded.return_rate_period,
+        return_type = excluded.return_type,
+        notes = excluded.notes`,
+    ).run(
+      asset.id,
+      asset.name,
+      asset.assetType,
+      asset.institution,
+      toCents(asset.currentValue),
+      asset.investedValue == null ? null : toCents(asset.investedValue),
+      asset.referenceDate,
+      asset.liquidity,
+      asset.owner,
+      asset.status,
+      asset.startDate,
+      asset.maturityDate,
+      asset.closedDate,
+      asset.returnRate == null ? null : toMicros(asset.returnRate),
+      asset.returnRatePeriod,
+      asset.returnType,
+      asset.notes,
+    );
+
+    db.prepare(
+      `insert into asset_balance_snapshots (asset_id, reference_date, balance_cents, invested_value_cents)
+       values (?, ?, ?, ?)
+       on conflict(asset_id, reference_date) do update set
+         balance_cents = excluded.balance_cents,
+         invested_value_cents = excluded.invested_value_cents`,
+    ).run(
+      asset.id,
+      asset.referenceDate,
+      toCents(asset.currentValue),
+      asset.investedValue == null ? null : toCents(asset.investedValue),
+    );
+  });
+}
+
+function upsertAssetMovement(movement) {
   db.prepare(
-    `insert into assets (
-      id, workspace_id, name, asset_type, institution, current_value_cents,
-      invested_value_cents, reference_date, liquidity, owner, notes
-    ) values (?, 'home', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    on conflict(id) do update set
-      name = excluded.name,
-      asset_type = excluded.asset_type,
-      institution = excluded.institution,
-      current_value_cents = excluded.current_value_cents,
-      invested_value_cents = excluded.invested_value_cents,
-      reference_date = excluded.reference_date,
-      liquidity = excluded.liquidity,
-      owner = excluded.owner,
-      notes = excluded.notes`,
-  ).run(
-    asset.id,
-    asset.name,
-    asset.assetType,
-    asset.institution,
-    toCents(asset.currentValue),
-    asset.investedValue == null ? null : toCents(asset.investedValue),
-    asset.referenceDate,
-    asset.liquidity,
-    asset.owner,
-    asset.notes,
-  );
+    `insert into asset_movements (id, asset_id, movement_type, amount_cents, movement_date, notes)
+     values (?, ?, ?, ?, ?, ?)
+     on conflict(id) do update set
+       asset_id = excluded.asset_id,
+       movement_type = excluded.movement_type,
+       amount_cents = excluded.amount_cents,
+       movement_date = excluded.movement_date,
+       notes = excluded.notes`,
+  ).run(movement.id, movement.assetId, movement.type, toCents(movement.amount), movement.date, movement.notes);
 }
 
 function upsertFinancialGoal(goal) {
@@ -1968,13 +2100,24 @@ function normalizeAsset(raw) {
   const currentValue = Number(raw.currentValue);
   const investedValue = raw.investedValue === "" || raw.investedValue == null ? null : Number(raw.investedValue);
   const referenceDate = String(raw.referenceDate || "");
+  const status = raw.status || "Ativo";
+  const startDate = optionalDate(raw.startDate, "startDate");
+  const maturityDate = optionalDate(raw.maturityDate, "maturityDate");
+  const closedDate = optionalDate(raw.closedDate, "closedDate");
+  const returnRate = raw.returnRate === "" || raw.returnRate == null ? null : Number(raw.returnRate);
+  const returnRatePeriod = returnRate == null ? null : raw.returnRatePeriod || "Anual";
 
   if (!Number.isFinite(currentValue) || currentValue < 0) throw new Error("Valor atual invalido.");
   if (investedValue != null && (!Number.isFinite(investedValue) || investedValue < 0)) throw new Error("Valor investido invalido.");
+  if (returnRate != null && (!Number.isFinite(returnRate) || returnRate <= -100)) throw new Error("Taxa de rentabilidade invalida.");
+  if (startDate && maturityDate && maturityDate < startDate) throw new Error("O vencimento nao pode ser anterior ao inicio.");
+  if (startDate && closedDate && closedDate < startDate) throw new Error("O encerramento nao pode ser anterior ao inicio.");
   assertDate(referenceDate, "referenceDate");
   assertChoice(raw.assetType, getAssetTypes(), "assetType");
   assertChoice(raw.liquidity, getLiquidityOptions(), "liquidity");
   assertChoice(raw.owner, ["Andre", "Luciana", "Ambos"], "owner");
+  assertChoice(status, getInvestmentStatuses(), "status");
+  if (returnRatePeriod) assertChoice(returnRatePeriod, getReturnRatePeriods(), "returnRatePeriod");
 
   return {
     id: raw.id || crypto.randomUUID(),
@@ -1986,6 +2129,31 @@ function normalizeAsset(raw) {
     referenceDate,
     liquidity: raw.liquidity,
     owner: raw.owner,
+    status,
+    startDate,
+    maturityDate,
+    closedDate,
+    returnRate,
+    returnRatePeriod,
+    returnType: String(raw.returnType || "").trim(),
+    notes: String(raw.notes || "").trim(),
+  };
+}
+
+function normalizeAssetMovement(raw) {
+  const amount = Number(raw.amount);
+  const date = String(raw.date || "");
+  assertAssetSupportsMovements(raw.assetId);
+  assertChoice(raw.type, ["Aporte", "Resgate"], "type");
+  assertDate(date, "date");
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("O valor do movimento precisa ser maior que zero.");
+
+  return {
+    id: raw.id || crypto.randomUUID(),
+    assetId: raw.assetId,
+    type: raw.type,
+    amount,
+    date,
     notes: String(raw.notes || "").trim(),
   };
 }
@@ -2137,9 +2305,9 @@ function normalizeTripExpense(raw) {
   const installmentCount = Math.max(1, Number(raw.installmentCount || 1));
   const status = raw.status || "Previsto";
 
-  if (!Number.isFinite(originalAmount) || originalAmount < 0) throw new Error("Valor original da despesa invalido.");
+  if (!Number.isFinite(originalAmount) || originalAmount <= 0) throw new Error("O valor da despesa precisa ser maior que zero.");
   if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) throw new Error("Cotacao invalida.");
-  if (!Number.isFinite(convertedAmount) || convertedAmount < 0) throw new Error("Valor convertido invalido.");
+  if (!Number.isFinite(convertedAmount) || convertedAmount <= 0) throw new Error("O valor convertido precisa ser maior que zero.");
   assertDate(expenseDate, "expenseDate");
   assertChoice(status, getTripExpenseStatuses(), "status");
   assertChoice(raw.paymentMethod || "Outro", getTripPaymentMethods(), "paymentMethod");
@@ -2361,7 +2529,36 @@ function rowToAsset(row) {
     referenceDate: row.reference_date,
     liquidity: row.liquidity,
     owner: row.owner,
+    status: row.investment_status || "Ativo",
+    startDate: row.start_date,
+    maturityDate: row.maturity_date,
+    closedDate: row.closed_date,
+    returnRate: row.return_rate_micros == null ? null : fromMicros(row.return_rate_micros),
+    returnRatePeriod: row.return_rate_period,
+    returnType: row.return_type || "",
     notes: row.notes,
+    movements: [],
+    snapshots: [],
+  };
+}
+
+function rowToAssetMovement(row) {
+  return {
+    id: row.id,
+    assetId: row.asset_id,
+    type: row.movement_type,
+    amount: fromCents(row.amount_cents),
+    date: row.movement_date,
+    notes: row.notes,
+  };
+}
+
+function rowToAssetSnapshot(row) {
+  return {
+    assetId: row.asset_id,
+    referenceDate: row.reference_date,
+    balance: fromCents(row.balance_cents),
+    investedValue: row.invested_value_cents == null ? null : fromCents(row.invested_value_cents),
   };
 }
 
@@ -2829,6 +3026,12 @@ function assertTripExists(id) {
   if (!exists) throw new Error("Viagem nao encontrada.");
 }
 
+function assertAssetSupportsMovements(id) {
+  const asset = db.prepare("select asset_type from assets where id = ?").get(id);
+  if (!asset) throw new Error("Investimento nao encontrado.");
+  if (!["Investimento", "Reserva"].includes(asset.asset_type)) throw new Error("Este item nao aceita aportes ou resgates.");
+}
+
 function assertTripTravelerBelongsToTrip(travelerId, tripId) {
   const exists = db.prepare("select 1 from trip_travelers where id = ? and trip_id = ?").get(travelerId, tripId);
   if (!exists) throw new Error("Viajante nao pertence a viagem.");
@@ -3053,6 +3256,14 @@ function getAssetTypes() {
 
 function getLiquidityOptions() {
   return ["D0", "D1", "Ate 30 dias", "Longo prazo", "Nao liquido"];
+}
+
+function getInvestmentStatuses() {
+  return ["Ativo", "Encerrado", "Resgatado", "Inativo"];
+}
+
+function getReturnRatePeriods() {
+  return ["Mensal", "Anual"];
 }
 
 function closeAndExit() {

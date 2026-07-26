@@ -86,11 +86,12 @@
             <input id="tripSearch" type="search" placeholder="Buscar viagem ou destino" />
             <select id="tripStatusFilter" aria-label="Filtrar viagens">
               <option value="active">Proximas e em andamento</option>
-              <option value="Planejamento">Planejamento</option>
-              <option value="Confirmada">Confirmadas</option>
+              <option value="Futura">Futuras</option>
               <option value="Em andamento">Em andamento</option>
               <option value="Concluida">Concluidas</option>
               <option value="Arquivada">Arquivadas</option>
+              <option value="Planejamento">Em planejamento</option>
+              <option value="Confirmada">Confirmadas</option>
               <option value="all">Todas</option>
             </select>
             <button class="primary-button" id="openTripForm">
@@ -98,6 +99,24 @@
               Nova viagem
             </button>
           </div>
+        </section>
+
+        <section class="trip-selector-panel" aria-label="Selecionar viagem">
+          <label class="trip-selector-control" for="tripSelector">
+            <span>Viagem selecionada</span>
+            <select id="tripSelector" aria-describedby="selectedTripMeta"></select>
+          </label>
+          <div class="selected-trip-identity" aria-live="polite">
+            <div>
+              <span class="status-pill" id="selectedTripStatus">Nenhuma viagem</span>
+              <strong id="selectedTripName">Crie ou selecione uma viagem</strong>
+            </div>
+            <span id="selectedTripMeta">O painel mostrara os gastos da viagem escolhida.</span>
+          </div>
+          <button class="compact-button" id="openTripFormFromSelector">
+            <i data-lucide="plus"></i>
+            Nova viagem
+          </button>
         </section>
 
         <section class="summary-grid" id="tripSummary" aria-label="Resumo de viagens"></section>
@@ -300,6 +319,11 @@
         <input type="hidden" id="expenseId" />
 
         <label class="field">
+          <span>Viagem relacionada</span>
+          <select id="expenseTrip" required></select>
+        </label>
+
+        <label class="field">
           <span>Descricao</span>
           <input id="expenseDescription" placeholder="Passagem, hotel, passeio..." required />
         </label>
@@ -307,7 +331,7 @@
         <div class="form-grid">
           <label class="field">
             <span>Categoria</span>
-            <select id="expenseCategory"></select>
+            <select id="expenseCategory" required></select>
           </label>
           <label class="field">
             <span>Status</span>
@@ -325,7 +349,7 @@
         <div class="form-grid">
           <label class="field">
             <span>Valor original</span>
-            <input id="expenseOriginalAmount" type="number" min="0" step="0.01" required />
+            <input id="expenseOriginalAmount" type="number" min="0.01" step="0.01" required />
           </label>
           <label class="field">
             <span>Moeda</span>
@@ -347,7 +371,7 @@
           </label>
           <label class="field">
             <span>Valor convertido</span>
-            <input id="expenseConvertedAmount" type="number" min="0" step="0.01" />
+            <input id="expenseConvertedAmount" type="number" min="0.01" step="0.01" />
           </label>
         </div>
 
@@ -361,6 +385,8 @@
             <input id="expenseDueDate" type="date" />
           </label>
         </div>
+
+        <p class="field-warning" id="expenseDateWarning" role="status" hidden></p>
 
         <div class="form-grid">
           <label class="field">
@@ -421,7 +447,7 @@
 
         <div class="modal-actions">
           <button class="ghost-button" type="button" data-close-dialog="expenseDialog">Cancelar</button>
-          <button class="primary-button" type="submit">
+          <button class="primary-button" id="saveExpenseButton" type="submit">
             <i data-lucide="save"></i>
             Salvar despesa
           </button>
@@ -537,6 +563,9 @@
     </dialog>
 
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./financial-utils.js"></script>
+    <script src="./trip-utils.js"></script>
+    <script src="./chart-utils.js"></script>
     <script src="./viagens.js"></script>
   </body>
 </html>

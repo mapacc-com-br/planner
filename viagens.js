@@ -3,9 +3,11 @@ const STORAGE_KEYS = {
   tripTab: "plannerFinanceiro:tripTab",
 };
 
+const finance = window.PlannerFinance;
+const tripUtils = window.TripUtils;
+const charts = window.PlannerCharts;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const dateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const shortDateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" });
 
 let trips = [];
@@ -13,6 +15,17 @@ let activeTripId = localStorage.getItem(STORAGE_KEYS.selectedTrip) || "";
 let activeTab = localStorage.getItem(STORAGE_KEYS.tripTab) || "overview";
 let currentActor = "Andre";
 let toastTimer = null;
+let savingExpense = false;
+let chartResizeTimer = null;
+let expenseFilterTimer = null;
+const expenseFilters = {
+  query: "",
+  categoryId: "",
+  paymentMethod: "",
+  dateFrom: "",
+  dateTo: "",
+  sort: "date-desc",
+};
 
 const elements = {
   tripSummary: document.querySelector("#tripSummary"),
@@ -20,6 +33,10 @@ const elements = {
   tripCount: document.querySelector("#tripCount"),
   tripSearch: document.querySelector("#tripSearch"),
   tripStatusFilter: document.querySelector("#tripStatusFilter"),
+  tripSelector: document.querySelector("#tripSelector"),
+  selectedTripStatus: document.querySelector("#selectedTripStatus"),
+  selectedTripName: document.querySelector("#selectedTripName"),
+  selectedTripMeta: document.querySelector("#selectedTripMeta"),
   tripDetail: document.querySelector("#tripDetail"),
   tripDetailKicker: document.querySelector("#tripDetailKicker"),
   tripDetailTitle: document.querySelector("#tripDetailTitle"),
@@ -59,6 +76,7 @@ async function initializeTrips() {
 
 function bindEvents() {
   document.querySelector("#openTripForm").addEventListener("click", () => openTripDialog());
+  document.querySelector("#openTripFormFromSelector").addEventListener("click", () => openTripDialog());
   document.querySelector("#openExpenseForm").addEventListener("click", () => openExpenseDialog());
   document.querySelector("#openExpenseFormFloating").addEventListener("click", () => openExpenseDialog());
   document.querySelector("#editActiveTrip").addEventListener("click", () => openTripDialog(getActiveTrip()));
@@ -66,6 +84,17 @@ function bindEvents() {
   document.querySelector("#logoutButton").addEventListener("click", logout);
   elements.tripSearch.addEventListener("input", render);
   elements.tripStatusFilter.addEventListener("change", render);
+  elements.tripSelector.addEventListener("change", () => {
+    activeTripId = elements.tripSelector.value;
+    localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
+    resetExpenseFilters();
+    render();
+  });
+  document.querySelector("#expenseTrip").addEventListener("change", () => {
+    configureExpenseFormForTrip(findTrip(document.querySelector("#expenseTrip").value));
+    updateExpenseDateWarning();
+  });
+  document.querySelector("#expenseDate").addEventListener("input", updateExpenseDateWarning);
 
   document.querySelectorAll("[data-close-dialog]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -94,6 +123,28 @@ function bindEvents() {
     }
   });
 
+  document.addEventListener("input", (event) => {
+    const field = event.target.closest("[data-expense-filter]");
+    if (!field || field.dataset.expenseFilter !== "query") return;
+    expenseFilters[field.dataset.expenseFilter] = field.value;
+    const cursor = field.selectionStart;
+    window.clearTimeout(expenseFilterTimer);
+    expenseFilterTimer = window.setTimeout(() => {
+      renderActiveTrip();
+      const replacement = document.querySelector('[data-expense-filter="query"]');
+      replacement?.focus();
+      replacement?.setSelectionRange?.(cursor, cursor);
+    }, 180);
+  });
+
+  document.addEventListener("change", (event) => {
+    const field = event.target.closest("[data-expense-filter]");
+    if (!field) return;
+    expenseFilters[field.dataset.expenseFilter] = field.value;
+    window.clearTimeout(expenseFilterTimer);
+    renderActiveTrip();
+  });
+
   elements.tripForm.addEventListener("submit", saveTripFromForm);
   elements.categoryForm.addEventListener("submit", saveCategoryFromForm);
   elements.expenseForm.addEventListener("submit", saveExpenseFromForm);
@@ -105,13 +156,25 @@ function bindEvents() {
   ["expenseOriginalAmount", "expenseExchangeRate"].forEach((id) => {
     document.querySelector(`#${id}`).addEventListener("input", updateConvertedAmountPreview);
   });
+
+  window.addEventListener("resize", () => {
+    window.clearTimeout(chartResizeTimer);
+    chartResizeTimer = window.setTimeout(renderTripCharts, 120);
+  });
 }
 
 async function handleAction(action, id) {
   if (action === "open-trip") {
     activeTripId = id;
     localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
+    resetExpenseFilters();
     render();
+    return;
+  }
+
+  if (action === "reset-expense-filters") {
+    resetExpenseFilters();
+    renderActiveTrip();
     return;
   }
 
@@ -154,10 +217,8 @@ async function syncSessionActor() {
 async function refreshTrips() {
   const state = await apiRequest("/api/trips");
   trips = Array.isArray(state.trips) ? state.trips : [];
-  if (!activeTripId || !findTrip(activeTripId)) {
-    activeTripId = trips.find((trip) => trip.status !== "Arquivada")?.id || trips[0]?.id || "";
-    if (activeTripId) localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
-  }
+  activeTripId = tripUtils.restoreSelectedTripId(localStorage, STORAGE_KEYS.selectedTrip, trips, todayKey());
+  if (activeTripId) localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
 }
 
 function renderLoading() {
@@ -175,27 +236,90 @@ function renderFatalError(error) {
 }
 
 function render() {
+  renderTripSelector();
   renderTripSummary();
   renderTripCards();
   renderActiveTrip();
   if (window.lucide) window.lucide.createIcons();
 }
 
+function renderTripSelector() {
+  const groups = ["Em andamento", "Futura", "Concluida", "Arquivada"];
+  const options = groups
+    .map((status) => {
+      const items = trips
+        .filter((trip) => tripUtils.temporalStatus(trip, todayKey()) === status)
+        .sort((a, b) => (status === "Concluida" ? b.endDate.localeCompare(a.endDate) : a.startDate.localeCompare(b.startDate)));
+      if (!items.length) return "";
+      return `
+        <optgroup label="${escapeAttribute(status)}">
+          ${items
+            .map(
+              (trip) => `
+                <option value="${escapeAttribute(trip.id)}" ${trip.id === activeTripId ? "selected" : ""}>
+                  ${escapeHtml(trip.name)} - ${escapeHtml(trip.primaryDestination)} - ${formatShortDate(trip.startDate)} a ${formatShortDate(trip.endDate)}
+                </option>
+              `,
+            )
+            .join("")}
+        </optgroup>
+      `;
+    })
+    .join("");
+
+  elements.tripSelector.disabled = trips.length === 0;
+  elements.tripSelector.innerHTML = options || `<option value="">Nenhuma viagem cadastrada</option>`;
+
+  const trip = getActiveTrip();
+  if (!trip) {
+    elements.selectedTripStatus.className = "status-pill";
+    elements.selectedTripStatus.textContent = "Nenhuma viagem";
+    elements.selectedTripName.textContent = "Crie ou selecione uma viagem";
+    elements.selectedTripMeta.textContent = "O painel mostrara os gastos da viagem escolhida.";
+    return;
+  }
+
+  const temporalStatus = tripUtils.temporalStatus(trip, todayKey());
+  elements.selectedTripStatus.className = `status-pill status-${statusClass(temporalStatus)}`;
+  elements.selectedTripStatus.textContent = temporalStatus === "Em andamento" ? "Viagem atual" : temporalStatus;
+  elements.selectedTripName.textContent = trip.name;
+  elements.selectedTripMeta.textContent = `${trip.primaryDestination} | ${formatDate(trip.startDate)} a ${formatDate(trip.endDate)} | ${trip.travelers.length || trip.travelersCount} viajante(s)`;
+}
+
 function renderTripSummary() {
   const visibleTrips = getFilteredTrips();
-  const openTrips = trips.filter((trip) => !["Concluida", "Arquivada"].includes(trip.status)).length;
-  const totalBudget = visibleTrips.reduce((total, trip) => total + Number(trip.totalBudget || 0), 0);
-  const totalSpent = visibleTrips.reduce((total, trip) => total + tripStats(trip).realized, 0);
+  const openTrips = trips.filter((trip) => ["Futura", "Em andamento"].includes(tripUtils.temporalStatus(trip, todayKey()))).length;
+  const selectedTrip = getActiveTrip();
+  const selectedStats = selectedTrip ? tripStats(selectedTrip) : null;
   const nextTrip = trips
-    .filter((trip) => trip.status !== "Arquivada" && trip.endDate >= todayKey())
+    .filter((trip) => tripUtils.temporalStatus(trip, todayKey()) === "Futura")
     .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
 
   const items = [
     { label: "Viagens ativas", value: openTrips, icon: "plane-takeoff", tone: "income", text: true },
-    { label: "Orcamento filtrado", value: totalBudget, icon: "wallet-cards", tone: "bills" },
-    { label: "Gasto registrado", value: totalSpent, icon: "receipt-text", tone: "paid" },
-    { label: "Proxima viagem", value: nextTrip ? daysUntil(nextTrip.startDate) : 0, suffix: " dias", icon: "calendar-days", tone: "pending", text: true },
-    { label: "Saldo filtrado", value: totalBudget - totalSpent, icon: "landmark", tone: "balance" },
+    { label: "Viagens encontradas", value: visibleTrips.length, icon: "list-filter", tone: "bills", text: true },
+    {
+      label: "Proxima viagem",
+      value: nextTrip ? daysUntil(nextTrip.startDate) : "-",
+      suffix: nextTrip ? " dias" : "",
+      icon: "calendar-days",
+      tone: "pending",
+      text: true,
+    },
+    {
+      label: "Orcamento selecionado",
+      value: selectedTrip?.totalBudget || 0,
+      currency: selectedTrip?.primaryCurrency || "BRL",
+      icon: "wallet-cards",
+      tone: "bills",
+    },
+    {
+      label: "Saldo selecionado",
+      value: selectedStats?.available || 0,
+      currency: selectedTrip?.primaryCurrency || "BRL",
+      icon: "landmark",
+      tone: "balance",
+    },
   ];
 
   elements.tripSummary.innerHTML = items
@@ -203,7 +327,7 @@ function renderTripSummary() {
       (item) => `
         <article class="summary-card ${item.tone}">
           <div class="summary-icon" aria-hidden="true"><i data-lucide="${item.icon}"></i></div>
-          <strong>${item.text ? `${item.value}${item.suffix || ""}` : formatMoney(item.value, "BRL")}</strong>
+          <strong>${item.text ? `${item.value}${item.suffix || ""}` : formatMoney(item.value, item.currency)}</strong>
           <span>${item.label}</span>
         </article>
       `,
@@ -221,18 +345,20 @@ function renderTripCards() {
 
 function tripCardTemplate(trip) {
   const stats = tripStats(trip);
-  const progress = trip.totalBudget ? Math.min((stats.realized / trip.totalBudget) * 100, 100) : 0;
+  const progress = Number.isFinite(stats.budgetUsed) ? stats.budgetUsed * 100 : stats.realized > 0 ? 100 : 0;
   const active = trip.id === activeTripId ? "is-active" : "";
+  const temporalStatus = tripUtils.temporalStatus(trip, todayKey());
+  const current = temporalStatus === "Em andamento" ? "is-current" : "";
   const daysLabel = tripDays(trip);
   const proximity = proximityLabel(trip);
 
   return `
-    <article class="trip-card ${active}" data-id="${trip.id}">
+    <article class="trip-card ${active} ${current}" data-id="${trip.id}">
       ${trip.coverImage ? `<div class="trip-cover" style="background-image: url('${escapeAttribute(trip.coverImage)}')"></div>` : `<div class="trip-cover trip-cover-empty"><i data-lucide="map"></i></div>`}
       <div class="trip-card-body">
         <div class="trip-card-title">
           <strong>${escapeHtml(trip.name)}</strong>
-          <span class="status-pill status-${statusClass(trip.status)}">${escapeHtml(trip.status)}</span>
+          <span class="status-pill status-${statusClass(temporalStatus)}">${escapeHtml(temporalStatus === "Em andamento" ? "Viagem atual" : temporalStatus)}</span>
         </div>
         <p>${escapeHtml(trip.primaryDestination)}</p>
         <div class="bill-meta">
@@ -244,9 +370,9 @@ function tripCardTemplate(trip) {
         <div class="trip-progress">
           <div class="category-line">
             <strong>${formatMoney(stats.realized, trip.primaryCurrency)} gastos</strong>
-            <span>${Math.round(progress)}% usado</span>
+            <span>${Math.round(progress)}% usado - ${escapeHtml(stats.budgetState.label)}</span>
           </div>
-          <div class="category-track"><div class="category-fill" style="--fill:${progress}%; --bar:${progress > 100 ? "#bf5b64" : "#2478c7"}"></div></div>
+          <div class="category-track budget-${stats.budgetState.key}"><div class="category-fill" style="--fill:${Math.min(progress, 100)}%;"></div></div>
         </div>
         <div class="trip-card-numbers">
           <span>Orcamento ${formatMoney(trip.totalBudget, trip.primaryCurrency)}</span>
@@ -277,7 +403,8 @@ function renderActiveTrip() {
   }
 
   elements.tripDetail.hidden = false;
-  elements.tripDetailKicker.textContent = `${trip.status} - ${trip.primaryCurrency}`;
+  const temporalStatus = tripUtils.temporalStatus(trip, todayKey());
+  elements.tripDetailKicker.textContent = `${temporalStatus} - ${trip.primaryCurrency}`;
   elements.tripDetailTitle.textContent = trip.name;
   elements.tripDetailMeta.textContent = `${trip.primaryDestination} | ${formatDate(trip.startDate)} a ${formatDate(trip.endDate)} | ${tripDays(trip)} dias | ${countdownLabel(trip)}`;
 
@@ -292,38 +419,62 @@ function renderActiveTrip() {
     report: renderReportTab,
   };
   elements.tripTabContent.innerHTML = (renderers[activeTab] || renderOverviewTab)(trip);
+  renderTripCharts();
+  if (window.lucide) window.lucide.createIcons();
 }
 
 function renderOverviewTab(trip) {
   const stats = tripStats(trip);
-  const cards = [
-    ["Orcamento total", trip.totalBudget, "landmark", "income"],
-    ["Total previsto", stats.planned, "wallet-cards", "bills"],
-    ["Total pago", stats.paid, "badge-check", "paid"],
-    ["Pendente", stats.pending, "circle-alert", "pending"],
-    ["Saldo", stats.available, "badge-dollar-sign", "balance"],
-    ["Media por dia", stats.averagePerDay, "calendar-days", "bills"],
-  ];
+  const hasBudget = Number(trip.totalBudget || 0) > 0;
+  const budgetPercentage = Number.isFinite(stats.budgetUsed) ? stats.budgetUsed : stats.realized > 0 ? 1 : 0;
+  const budgetProgress = Math.min(Math.max(budgetPercentage * 100, 0), 100);
+  const temporalStatus = tripUtils.temporalStatus(trip, todayKey());
 
   return `
     <section class="travel-dashboard">
-      <div class="mini-summary-grid">
-        ${cards
-          .map(
-            ([label, value, icon, tone]) => `
-              <article class="summary-card ${tone}">
-                <div class="summary-icon"><i data-lucide="${icon}"></i></div>
-                <strong>${formatMoney(value, trip.primaryCurrency)}</strong>
-                <span>${label}</span>
-              </article>
-            `,
-          )
-          .join("")}
+      <section class="selected-trip-summary">
+        <div class="selected-trip-summary-heading">
+          <div>
+            <span class="status-pill status-${statusClass(temporalStatus)}">${escapeHtml(temporalStatus)}</span>
+            <p class="eyebrow">Resumo da viagem selecionada</p>
+            <h2>${escapeHtml(trip.name)}</h2>
+            <p>${escapeHtml(trip.primaryDestination)} | ${formatDate(trip.startDate)} a ${formatDate(trip.endDate)}</p>
+          </div>
+          <div class="selected-trip-budget">
+            <span>Orcamento utilizado</span>
+            <strong>${hasBudget ? finance.formatPercent(budgetPercentage) : "Sem orcamento"}</strong>
+            <small>${escapeHtml(stats.budgetState.label)}</small>
+          </div>
+        </div>
+        <div class="budget-progress budget-${stats.budgetState.key}" role="progressbar" aria-label="Orcamento utilizado" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(
+          budgetPercentage * 100,
+        )}">
+          <span style="--budget-progress:${budgetProgress}%"></span>
+        </div>
+      </section>
+
+      <div class="trip-metric-grid">
+        ${tripMetricCard("Orcamento total", formatMoney(trip.totalBudget, trip.primaryCurrency), "landmark", "income")}
+        ${tripMetricCard("Total gasto", formatMoney(stats.realized, trip.primaryCurrency), "receipt-text", "paid")}
+        ${tripMetricCard("Saldo disponivel", formatMoney(stats.available, trip.primaryCurrency), "badge-dollar-sign", stats.available >= 0 ? "balance" : "pending")}
+        ${tripMetricCard("Previsto ainda nao realizado", formatMoney(stats.forecast, trip.primaryCurrency), "wallet-cards", "bills")}
+        ${tripMetricCard("Media de gastos por dia", formatMoney(stats.averagePerDay, trip.primaryCurrency), "calendar-days", "bills")}
+        ${tripMetricCard(stats.status === "Futura" ? "Dias para comecar" : "Dias restantes", String(stats.daysRemaining), "calendar-clock", "income")}
+        ${tripMetricCard(
+          "Estimativa ate o final",
+          stats.estimatedFinalSpend == null ? "Dados insuficientes" : formatMoney(stats.estimatedFinalSpend, trip.primaryCurrency),
+          "chart-spline",
+          "balance",
+        )}
+        ${tripMetricCard("Total pago", formatMoney(stats.paid, trip.primaryCurrency), "badge-check", "paid")}
       </div>
+
+      ${tripChartsTemplate(trip)}
+
       <div class="travel-insight-grid">
         <section class="panel inner-panel">
-          <div class="panel-header"><div><p class="eyebrow">Categorias</p><h3>Previsto versus realizado</h3></div></div>
-          ${categoryUsageTemplate(trip)}
+          <div class="panel-header"><div><p class="eyebrow">Categorias</p><h3>Resumo dos gastos</h3></div></div>
+          ${tripCategorySummaryTemplate(trip)}
         </section>
         <section class="panel inner-panel">
           <div class="panel-header"><div><p class="eyebrow">Acerto</p><h3>Quem pagou e quem usou</h3></div></div>
@@ -334,11 +485,52 @@ function renderOverviewTab(trip) {
   `;
 }
 
+function tripMetricCard(label, value, icon, tone) {
+  return `
+    <article class="summary-card ${tone}">
+      <div class="summary-icon" aria-hidden="true"><i data-lucide="${icon}"></i></div>
+      <strong>${value}</strong>
+      <span>${label}</span>
+    </article>
+  `;
+}
+
+function tripChartsTemplate(trip) {
+  const stats = tripStats(trip);
+  const categorySummary = tripUtils.summarizeExpensesByCategory(trip);
+  return `
+    <section class="trip-charts-grid" aria-label="Graficos financeiros da viagem">
+      <article class="chart-card chart-card-wide">
+        <div class="chart-card-header">
+          <div><p class="eyebrow">Categorias</p><h3>Gastos por categoria</h3></div>
+          <span>${categorySummary.length} categoria(s)</span>
+        </div>
+        ${tripCategoryChartTemplate(trip, categorySummary)}
+      </article>
+      <article class="chart-card">
+        <div class="chart-card-header"><div><p class="eyebrow">Ritmo</p><h3>Gastos por dia</h3></div></div>
+        <div class="chart-shell"><canvas id="tripDailyChart" role="img" aria-label="Grafico de gastos por dia"></canvas></div>
+      </article>
+      <article class="chart-card">
+        <div class="chart-card-header"><div><p class="eyebrow">Acumulado</p><h3>Evolucao dos gastos</h3></div></div>
+        <div class="chart-shell"><canvas id="tripCumulativeChart" role="img" aria-label="Grafico de gastos acumulados"></canvas></div>
+      </article>
+      <article class="chart-card chart-card-wide">
+        <div class="chart-card-header">
+          <div><p class="eyebrow">Orcamento</p><h3>Total versus gasto</h3></div>
+          <span>${escapeHtml(stats.budgetState.label)}</span>
+        </div>
+        ${budgetComparisonTemplate(trip, stats)}
+      </article>
+    </section>
+  `;
+}
+
 function renderBudgetTab(trip) {
   const rows = trip.categories
     .map((category) => {
       const realized = trip.expenses
-        .filter((expense) => expense.categoryId === category.id && !["Cancelado", "Reembolsado"].includes(expense.status))
+        .filter((expense) => expense.categoryId === category.id && !["Cancelado", "Reembolsado", "Previsto"].includes(expense.status))
         .reduce((total, expense) => total + Number(expense.convertedAmount || 0), 0);
       const diff = Number(category.plannedAmount || 0) - realized;
       const pct = category.plannedAmount ? Math.round((realized / category.plannedAmount) * 100) : 0;
@@ -367,37 +559,125 @@ function renderBudgetTab(trip) {
 }
 
 function renderExpensesTab(trip) {
-  const rows = trip.expenses.length
-    ? trip.expenses
-        .map((expense) => {
-          const category = trip.categories.find((item) => item.id === expense.categoryId);
-          const paidBy = trip.travelers.find((item) => item.id === expense.paidByTravelerId)?.name || "Nao informado";
-          return `
-            <article class="travel-row ${statusClass(expense.status)}" data-id="${expense.id}">
-              <div>
-                <div class="bill-title-line">
-                  <strong>${escapeHtml(expense.description)}</strong>
-                  <span class="status-pill status-${statusClass(expense.status)}">${escapeHtml(expense.status)}</span>
-                </div>
-                <div class="bill-meta">
-                  <span>${escapeHtml(category?.name || "Sem categoria")}</span>
-                  <span>${formatShortDate(expense.expenseDate)}</span>
-                  <span>${escapeHtml(expense.originalCurrency)} ${formatNumber(expense.originalAmount)}</span>
-                  <span>Pago por ${escapeHtml(paidBy)}</span>
-                  <span>${expense.installmentCount} parcela(s)</span>
-                </div>
-              </div>
-              <div class="bill-actions">
-                <span class="bill-value">${formatMoney(expense.convertedAmount, trip.primaryCurrency)}</span>
-                <button class="icon-button" data-action="edit-expense" title="Editar" aria-label="Editar"><i data-lucide="pencil"></i></button>
-                <button class="icon-button" data-action="delete-expense" title="Excluir" aria-label="Excluir"><i data-lucide="trash-2"></i></button>
-              </div>
-            </article>
-          `;
-        })
-        .join("")
-    : emptyTemplate("Nenhuma despesa registrada.");
-  return tabPanelHeader("Despesas da viagem", "open-expense", "Despesa") + rows;
+  const filteredExpenses = tripUtils.filterExpenses(trip.expenses, expenseFilters);
+  const groups = tripUtils.groupExpensesByDay(filteredExpenses);
+  const paymentMethods = [...new Set(trip.expenses.map((expense) => expense.paymentMethod).filter(Boolean))].sort();
+  const filterActive = Object.entries(expenseFilters).some(([key, value]) => key !== "sort" && value);
+
+  return `
+    ${tabPanelHeader("Despesas da viagem", "open-expense", "Despesa")}
+    <section class="expense-filter-panel" aria-label="Filtros de gastos">
+      <label class="field">
+        <span>Buscar descricao</span>
+        <input data-expense-filter="query" type="search" value="${escapeAttribute(expenseFilters.query)}" placeholder="Hotel, passagem, restaurante..." />
+      </label>
+      <label class="field">
+        <span>Categoria</span>
+        <select data-expense-filter="categoryId">
+          <option value="">Todas</option>
+          ${trip.categories
+            .map(
+              (category) =>
+                `<option value="${escapeAttribute(category.id)}" ${expenseFilters.categoryId === category.id ? "selected" : ""}>${escapeHtml(
+                  category.name,
+                )}</option>`,
+            )
+            .join("")}
+        </select>
+      </label>
+      <label class="field">
+        <span>Forma de pagamento</span>
+        <select data-expense-filter="paymentMethod">
+          <option value="">Todas</option>
+          ${paymentMethods
+            .map(
+              (method) =>
+                `<option value="${escapeAttribute(method)}" ${expenseFilters.paymentMethod === method ? "selected" : ""}>${escapeHtml(method)}</option>`,
+            )
+            .join("")}
+        </select>
+      </label>
+      <label class="field">
+        <span>De</span>
+        <input data-expense-filter="dateFrom" type="date" value="${escapeAttribute(expenseFilters.dateFrom)}" />
+      </label>
+      <label class="field">
+        <span>Ate</span>
+        <input data-expense-filter="dateTo" type="date" value="${escapeAttribute(expenseFilters.dateTo)}" />
+      </label>
+      <label class="field">
+        <span>Ordenar</span>
+        <select data-expense-filter="sort">
+          <option value="date-desc" ${expenseFilters.sort === "date-desc" ? "selected" : ""}>Data mais recente</option>
+          <option value="date-asc" ${expenseFilters.sort === "date-asc" ? "selected" : ""}>Data mais antiga</option>
+          <option value="amount-desc" ${expenseFilters.sort === "amount-desc" ? "selected" : ""}>Maior valor</option>
+          <option value="amount-asc" ${expenseFilters.sort === "amount-asc" ? "selected" : ""}>Menor valor</option>
+        </select>
+      </label>
+      <button class="ghost-button" data-action="reset-expense-filters" ${filterActive ? "" : "disabled"}>Limpar filtros</button>
+    </section>
+
+    <section class="expense-category-overview">
+      <div class="tab-panel-header">
+        <div><p class="eyebrow">Resumo</p><h3>Gastos por categoria</h3></div>
+        <span>${filteredExpenses.length} lancamento(s) exibido(s)</span>
+      </div>
+      ${tripCategorySummaryTemplate({ ...trip, expenses: filteredExpenses })}
+    </section>
+
+    <section class="expense-day-list">
+      ${
+        groups.length
+          ? groups.map((group) => expenseDayGroupTemplate(trip, group)).join("")
+          : emptyTemplate(trip.expenses.length ? "Nenhum gasto corresponde aos filtros." : "Nenhuma despesa registrada.")
+      }
+    </section>
+  `;
+}
+
+function expenseDayGroupTemplate(trip, group) {
+  return `
+    <section class="expense-day-group">
+      <div class="expense-day-heading">
+        <div>
+          <p class="eyebrow">${formatDate(group.date)}</p>
+          <h3>${group.items.length} lancamento(s)</h3>
+        </div>
+        <strong>${formatMoney(group.total, trip.primaryCurrency)}</strong>
+      </div>
+      <div class="expense-day-items">
+        ${group.items.map((expense) => expenseRowTemplate(trip, expense)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function expenseRowTemplate(trip, expense) {
+  const category = trip.categories.find((item) => item.id === expense.categoryId);
+  const paidBy = trip.travelers.find((item) => item.id === expense.paidByTravelerId)?.name || "Nao informado";
+  return `
+    <article class="travel-row ${statusClass(expense.status)}" data-id="${expense.id}">
+      <div>
+        <div class="bill-title-line">
+          <strong>${escapeHtml(expense.description)}</strong>
+          <span class="status-pill status-${statusClass(expense.status)}">${escapeHtml(expense.status)}</span>
+        </div>
+        <div class="bill-meta">
+          <span>${escapeHtml(category?.name || "Sem categoria")}</span>
+          <span>${escapeHtml(expense.paymentMethod)}</span>
+          <span>${escapeHtml(expense.originalCurrency)} ${formatNumber(expense.originalAmount)}</span>
+          <span>Pago por ${escapeHtml(paidBy)}</span>
+          <span>${expense.installmentCount} parcela(s)</span>
+          ${expense.notes ? `<span>${escapeHtml(expense.notes)}</span>` : ""}
+        </div>
+      </div>
+      <div class="bill-actions">
+        <span class="bill-value">${formatMoney(expense.convertedAmount, trip.primaryCurrency)}</span>
+        <button class="icon-button" data-action="edit-expense" title="Editar gasto" aria-label="Editar gasto"><i data-lucide="pencil"></i></button>
+        <button class="icon-button" data-action="delete-expense" title="Excluir gasto" aria-label="Excluir gasto"><i data-lucide="trash-2"></i></button>
+      </div>
+    </article>
+  `;
 }
 
 function renderReservationsTab(trip) {
@@ -545,23 +825,115 @@ function tabPanelHeader(title, action, label) {
   `;
 }
 
-function categoryUsageTemplate(trip) {
-  const rows = trip.categories
-    .map((category) => {
-      const realized = trip.expenses
-        .filter((expense) => expense.categoryId === category.id && !["Cancelado", "Reembolsado"].includes(expense.status))
-        .reduce((total, expense) => total + Number(expense.convertedAmount || 0), 0);
-      if (!category.plannedAmount && !realized) return "";
-      const pct = category.plannedAmount ? Math.min((realized / category.plannedAmount) * 100, 100) : 100;
-      return `
-        <div class="category-row">
-          <div class="category-line"><strong>${escapeHtml(category.name)}</strong><span>${formatMoney(realized, trip.primaryCurrency)} / ${formatMoney(category.plannedAmount, trip.primaryCurrency)}</span></div>
-          <div class="category-track"><div class="category-fill" style="--fill:${pct}%; --bar:${category.color}"></div></div>
-        </div>
-      `;
-    })
+function tripCategoryChartTemplate(trip, summary = tripUtils.summarizeExpensesByCategory(trip)) {
+  if (!summary.length) return emptyTemplate("Cadastre gastos para visualizar as categorias.");
+  const max = Math.max(...summary.map((item) => item.total), 1);
+  return `
+    <div class="horizontal-chart">
+      ${summary
+        .map(
+          (item) => `
+            <div class="horizontal-chart-row">
+              <div class="category-line">
+                <strong>${escapeHtml(item.name)}</strong>
+                <span>${formatMoney(item.total, trip.primaryCurrency)} - ${finance.formatPercent(item.percentage)}</span>
+              </div>
+              <div class="horizontal-chart-track" aria-hidden="true">
+                <span style="--chart-fill:${Math.max((item.total / max) * 100, item.total > 0 ? 4 : 0)}%; --chart-color:${escapeAttribute(item.color)}"></span>
+              </div>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function tripCategorySummaryTemplate(trip) {
+  const summary = tripUtils.summarizeExpensesByCategory(trip);
+  if (!summary.length) return emptyTemplate("Sem gastos realizados por categoria.");
+  return summary
+    .map(
+      (item) => `
+        <article class="category-summary-row">
+          <div class="category-summary-heading">
+            <strong>${escapeHtml(item.name)}</strong>
+            <span>${formatMoney(item.total, trip.primaryCurrency)}</span>
+          </div>
+          <div class="bill-meta">
+            <span>${finance.formatPercent(item.percentage)} do total</span>
+            <span>${item.count} lancamento(s)</span>
+            ${
+              item.plannedAmount > 0
+                ? `<span>${item.budgetDifference >= 0 ? "Saldo da categoria" : "Acima da categoria"}: ${formatMoney(
+                    Math.abs(item.budgetDifference),
+                    trip.primaryCurrency,
+                  )}</span>`
+                : "<span>Sem orcamento da categoria</span>"
+            }
+          </div>
+        </article>
+      `,
+    )
     .join("");
-  return rows || emptyTemplate("Sem gastos por categoria.");
+}
+
+function budgetComparisonTemplate(trip, stats) {
+  const scale = Math.max(Number(trip.totalBudget || 0), stats.realized, 1);
+  const budgetWidth = (Number(trip.totalBudget || 0) / scale) * 100;
+  const spentWidth = (stats.realized / scale) * 100;
+  return `
+    <div class="budget-comparison">
+      <div>
+        <div class="category-line"><strong>Orcamento total</strong><span>${formatMoney(trip.totalBudget, trip.primaryCurrency)}</span></div>
+        <div class="budget-comparison-track"><span class="is-budget" style="--comparison-width:${budgetWidth}%"></span></div>
+      </div>
+      <div>
+        <div class="category-line"><strong>Total gasto</strong><span>${formatMoney(stats.realized, trip.primaryCurrency)}</span></div>
+        <div class="budget-comparison-track"><span class="is-spent budget-${stats.budgetState.key}" style="--comparison-width:${spentWidth}%"></span></div>
+      </div>
+      <p>${stats.available >= 0 ? `Restam ${formatMoney(stats.available, trip.primaryCurrency)}.` : `O limite foi ultrapassado em ${formatMoney(
+        Math.abs(stats.available),
+        trip.primaryCurrency,
+      )}.`}</p>
+    </div>
+  `;
+}
+
+function renderTripCharts() {
+  const trip = getActiveTrip();
+  if (!trip) return;
+  const daily = tripUtils.buildDailyExpenseSeries(trip);
+  const labels = daily.map((item) => formatShortDate(item.date));
+  const formatAxisValue = (value) =>
+    new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: trip.primaryCurrency,
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value);
+
+  const dailyCanvas = document.querySelector("#tripDailyChart");
+  if (dailyCanvas) {
+    charts.renderBarChart(dailyCanvas, {
+      labels,
+      datasets: [{ label: "Gasto do dia", color: "#2478c7", values: daily.map((item) => item.total) }],
+      formatValue: (value) => formatMoney(value, trip.primaryCurrency),
+      formatAxisValue,
+      emptyMessage: "Sem gastos realizados por dia.",
+    });
+  }
+
+  const cumulativeCanvas = document.querySelector("#tripCumulativeChart");
+  if (cumulativeCanvas) {
+    charts.renderLineChart(cumulativeCanvas, {
+      labels,
+      datasets: [{ label: "Gasto acumulado", color: "#2f8b80", values: daily.map((item) => item.cumulative) }],
+      formatValue: (value) => formatMoney(value, trip.primaryCurrency),
+      formatAxisValue,
+      emptyMessage: "Sem gastos para acumular.",
+    });
+  }
 }
 
 function settlementTemplate(trip) {
@@ -674,13 +1046,14 @@ async function saveCategoryFromForm(event) {
 }
 
 function openExpenseDialog(expense = null) {
-  const trip = getActiveTrip();
+  const trip = expense ? findTrip(expense.tripId) : getActiveTrip();
   if (!trip) return showToast("Selecione uma viagem.");
   elements.expenseForm.reset();
-  fillTripSelects(trip);
+  fillExpenseTripSelect(trip.id);
+  configureExpenseFormForTrip(trip);
   document.querySelector("#expenseId").value = expense?.id || "";
   document.querySelector("#expenseDescription").value = expense?.description || "";
-  document.querySelector("#expenseCategory").value = expense?.categoryId || "";
+  document.querySelector("#expenseCategory").value = expense?.categoryId || trip.categories[0]?.id || "";
   document.querySelector("#expenseStatus").value = expense?.status || "Previsto";
   document.querySelector("#expenseOriginalAmount").value = expense?.originalAmount ?? "";
   document.querySelector("#expenseCurrency").value = expense?.originalCurrency || trip.primaryCurrency;
@@ -697,41 +1070,63 @@ function openExpenseDialog(expense = null) {
   document.querySelector("#expenseSyncPlanner").checked = Boolean(expense?.syncToPlanner);
   document.querySelector("#expenseNotes").value = expense?.notes || "";
   renderParticipantChoices(trip, expense?.participants || []);
+  updateExpenseDateWarning();
   elements.expenseDialog.showModal();
 }
 
 async function saveExpenseFromForm(event) {
   event.preventDefault();
-  const trip = getActiveTrip();
-  const selectedParticipants = [...document.querySelectorAll("[data-expense-participant]:checked")].map((input) => ({ travelerId: input.value }));
-  const convertedAmount = document.querySelector("#expenseConvertedAmount").value;
-  const payload = {
-    id: document.querySelector("#expenseId").value || createId(),
-    tripId: trip.id,
-    categoryId: document.querySelector("#expenseCategory").value || null,
-    description: document.querySelector("#expenseDescription").value.trim(),
-    originalAmount: Number(document.querySelector("#expenseOriginalAmount").value),
-    originalCurrency: document.querySelector("#expenseCurrency").value,
-    exchangeRate: Number(document.querySelector("#expenseExchangeRate").value),
-    convertedAmount: convertedAmount ? Number(convertedAmount) : null,
-    expenseDate: document.querySelector("#expenseDate").value,
-    dueDate: document.querySelector("#expenseDueDate").value || document.querySelector("#expenseDate").value,
-    paidDate: document.querySelector("#expensePaidDate").value || null,
-    status: document.querySelector("#expenseStatus").value,
-    paymentMethod: document.querySelector("#expensePaymentMethod").value,
-    paidByTravelerId: document.querySelector("#expensePaidBy").value || null,
-    installmentCount: Number(document.querySelector("#expenseInstallments").value || 1),
-    destination: document.querySelector("#expenseDestination").value.trim(),
-    accountLabel: document.querySelector("#expenseAccountLabel").value.trim(),
-    syncToPlanner: document.querySelector("#expenseSyncPlanner").checked,
-    participants: selectedParticipants.length ? selectedParticipants : trip.travelers.map((traveler) => ({ travelerId: traveler.id })),
-    notes: document.querySelector("#expenseNotes").value.trim(),
-  };
-  await apiRequest("/api/trip-expenses", { method: "POST", body: payload });
-  await refreshTrips();
-  elements.expenseDialog.close();
-  render();
-  showToast("Despesa salva.");
+  if (savingExpense) return;
+
+  const trip = findTrip(document.querySelector("#expenseTrip").value);
+  if (!trip) return showToast("Selecione a viagem relacionada.");
+  const originalAmount = Number(document.querySelector("#expenseOriginalAmount").value);
+  if (!Number.isFinite(originalAmount) || originalAmount <= 0) return showToast("O valor do gasto precisa ser maior que zero.");
+
+  savingExpense = true;
+  const saveButton = document.querySelector("#saveExpenseButton");
+  saveButton.disabled = true;
+
+  try {
+    const selectedParticipants = [...document.querySelectorAll("[data-expense-participant]:checked")].map((input) => ({
+      travelerId: input.value,
+    }));
+    const convertedAmount = document.querySelector("#expenseConvertedAmount").value;
+    const payload = {
+      id: document.querySelector("#expenseId").value || createId(),
+      tripId: trip.id,
+      categoryId: document.querySelector("#expenseCategory").value,
+      description: document.querySelector("#expenseDescription").value.trim(),
+      originalAmount,
+      originalCurrency: document.querySelector("#expenseCurrency").value,
+      exchangeRate: Number(document.querySelector("#expenseExchangeRate").value),
+      convertedAmount: convertedAmount ? Number(convertedAmount) : null,
+      expenseDate: document.querySelector("#expenseDate").value,
+      dueDate: document.querySelector("#expenseDueDate").value || document.querySelector("#expenseDate").value,
+      paidDate: document.querySelector("#expensePaidDate").value || null,
+      status: document.querySelector("#expenseStatus").value,
+      paymentMethod: document.querySelector("#expensePaymentMethod").value,
+      paidByTravelerId: document.querySelector("#expensePaidBy").value || null,
+      installmentCount: Number(document.querySelector("#expenseInstallments").value || 1),
+      destination: document.querySelector("#expenseDestination").value.trim(),
+      accountLabel: document.querySelector("#expenseAccountLabel").value.trim(),
+      syncToPlanner: document.querySelector("#expenseSyncPlanner").checked,
+      participants: selectedParticipants.length ? selectedParticipants : trip.travelers.map((traveler) => ({ travelerId: traveler.id })),
+      notes: document.querySelector("#expenseNotes").value.trim(),
+    };
+    await apiRequest("/api/trip-expenses", { method: "POST", body: payload });
+    activeTripId = trip.id;
+    localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
+    await refreshTrips();
+    elements.expenseDialog.close();
+    render();
+    showToast("Gasto salvo e totais atualizados.");
+  } catch (error) {
+    showToast(error.message || "Nao foi possivel salvar o gasto.");
+  } finally {
+    savingExpense = false;
+    saveButton.disabled = false;
+  }
 }
 
 function openReservationDialog(reservation = null) {
@@ -932,14 +1327,37 @@ async function toggleChecklist(id) {
   render();
 }
 
-function fillTripSelects(trip) {
-  document.querySelector("#expenseCategory").innerHTML = `<option value="">Sem categoria</option>` + trip.categories.map((category) => `<option value="${category.id}">${escapeHtml(category.name)}</option>`).join("");
+function fillExpenseTripSelect(selectedTripId) {
+  const select = document.querySelector("#expenseTrip");
+  select.innerHTML = trips
+    .map(
+      (trip) =>
+        `<option value="${escapeAttribute(trip.id)}" ${trip.id === selectedTripId ? "selected" : ""}>${escapeHtml(trip.name)} - ${escapeHtml(
+          trip.primaryDestination,
+        )} - ${formatShortDate(trip.startDate)} a ${formatShortDate(trip.endDate)}</option>`,
+    )
+    .join("");
+}
+
+function configureExpenseFormForTrip(trip) {
+  if (!trip) return;
+  const categorySelect = document.querySelector("#expenseCategory");
+  categorySelect.innerHTML =
+    `<option value="" disabled>Selecione uma categoria</option>` +
+    trip.categories.map((category) => `<option value="${escapeAttribute(category.id)}">${escapeHtml(category.name)}</option>`).join("");
+  categorySelect.value = trip.categories[0]?.id || "";
   fillTravelerSelect("#expensePaidBy", trip);
+  document.querySelector("#expensePaidBy").value = trip.travelers[0]?.id || "";
+  document.querySelector("#expenseCurrency").value = trip.primaryCurrency;
+  document.querySelector("#expenseExchangeRate").value = 1;
+  renderParticipantChoices(trip, []);
 }
 
 function fillTravelerSelect(selector, trip, includeEmpty = false) {
   const select = document.querySelector(selector);
-  select.innerHTML = `${includeEmpty ? `<option value="">Viagem</option>` : ""}${trip.travelers.map((traveler) => `<option value="${traveler.id}">${escapeHtml(traveler.name)}</option>`).join("")}`;
+  select.innerHTML = `${includeEmpty ? `<option value="">Viagem</option>` : ""}${trip.travelers
+    .map((traveler) => `<option value="${escapeAttribute(traveler.id)}">${escapeHtml(traveler.name)}</option>`)
+    .join("")}`;
 }
 
 function renderParticipantChoices(trip, participants) {
@@ -949,12 +1367,23 @@ function renderParticipantChoices(trip, participants) {
     .map(
       (traveler) => `
         <label class="choice-pill">
-          <input data-expense-participant type="checkbox" value="${traveler.id}" ${allSelected || selected.has(traveler.id) ? "checked" : ""} />
+          <input data-expense-participant type="checkbox" value="${escapeAttribute(traveler.id)}" ${allSelected || selected.has(traveler.id) ? "checked" : ""} />
           <span>${escapeHtml(traveler.name)}</span>
         </label>
       `,
     )
     .join("");
+}
+
+function updateExpenseDateWarning() {
+  const trip = findTrip(document.querySelector("#expenseTrip").value);
+  const date = document.querySelector("#expenseDate").value;
+  const warning = document.querySelector("#expenseDateWarning");
+  const outside = tripUtils.isDateOutsideTrip(date, trip);
+  warning.hidden = !outside;
+  warning.textContent = outside
+    ? `A data esta fora do periodo de ${formatDate(trip.startDate)} a ${formatDate(trip.endDate)}. Voce pode salvar mesmo assim.`
+    : "";
 }
 
 function updateConvertedAmountPreview() {
@@ -964,43 +1393,41 @@ function updateConvertedAmountPreview() {
   if (!field.value && amount && rate) field.placeholder = formatNumber(amount * rate);
 }
 
+function resetExpenseFilters() {
+  Object.assign(expenseFilters, {
+    query: "",
+    categoryId: "",
+    paymentMethod: "",
+    dateFrom: "",
+    dateTo: "",
+    sort: "date-desc",
+  });
+}
+
 function getFilteredTrips() {
   const query = normalizeText(elements.tripSearch.value);
   const status = elements.tripStatusFilter.value;
   return trips.filter((trip) => {
     const haystack = normalizeText(`${trip.name} ${trip.primaryDestination} ${trip.otherDestinations} ${trip.status}`);
     const matchesQuery = !query || haystack.includes(query);
+    const temporalStatus = tripUtils.temporalStatus(trip, todayKey());
+    const usesTemporalStatus = ["Futura", "Em andamento", "Concluida", "Arquivada"].includes(status);
     const matchesStatus =
       status === "all" ||
-      (status === "active" && !["Concluida", "Arquivada"].includes(trip.status)) ||
-      trip.status === status;
+      (status === "active" && ["Futura", "Em andamento"].includes(temporalStatus)) ||
+      (usesTemporalStatus ? temporalStatus === status : trip.status === status);
     return matchesQuery && matchesStatus;
   });
 }
 
 function tripStats(trip) {
-  const validExpenses = trip.expenses.filter((expense) => !["Cancelado", "Reembolsado"].includes(expense.status));
-  const realized = validExpenses.reduce((total, expense) => total + Number(expense.convertedAmount || 0), 0);
-  const paid = validExpenses.filter((expense) => expense.status === "Pago").reduce((total, expense) => total + Number(expense.convertedAmount || 0), 0);
-  const pending = validExpenses.filter((expense) => ["Reservado", "Pendente"].includes(expense.status)).reduce((total, expense) => total + Number(expense.convertedAmount || 0), 0);
-  const planned = trip.categories.reduce((total, category) => total + Number(category.plannedAmount || 0), 0);
-  const available = Number(trip.totalBudget || 0) - realized;
-  const days = Math.max(tripDays(trip), 1);
-  return {
-    realized,
-    paid,
-    pending,
-    planned,
-    available,
-    averagePerDay: realized / days,
-    averagePerPerson: realized / Math.max(trip.travelers.length || trip.travelersCount || 1, 1),
-  };
+  return tripUtils.calculateTripMetrics(trip, todayKey());
 }
 
 function travelerSettlement(trip) {
   const map = new Map(trip.travelers.map((traveler) => [traveler.id, { name: traveler.name, paid: 0, share: 0, balance: 0 }]));
   trip.expenses
-    .filter((expense) => !["Cancelado", "Reembolsado"].includes(expense.status))
+    .filter((expense) => !["Cancelado", "Reembolsado", "Previsto"].includes(expense.status))
     .forEach((expense) => {
       if (expense.paidByTravelerId && map.has(expense.paidByTravelerId)) {
         map.get(expense.paidByTravelerId).paid += Number(expense.convertedAmount || 0);
@@ -1096,7 +1523,7 @@ function totalsBy(items, keyFn, valueFn) {
 }
 
 function tripDays(trip) {
-  return Math.max(Math.round((dateFromKey(trip.endDate) - dateFromKey(trip.startDate)) / DAY_MS) + 1, 1);
+  return tripUtils.tripDays(trip);
 }
 
 function daysUntil(dateKeyValue) {
@@ -1104,19 +1531,20 @@ function daysUntil(dateKeyValue) {
 }
 
 function proximityLabel(trip) {
-  if (trip.status === "Arquivada") return "Arquivada";
-  if (trip.endDate < todayKey()) return "Concluida ou passada";
+  const temporalStatus = tripUtils.temporalStatus(trip, todayKey());
+  if (temporalStatus === "Arquivada") return "Arquivada";
+  if (temporalStatus === "Concluida") return "Viagem concluida";
+  if (temporalStatus === "Em andamento") return "Viagem atual";
   const days = daysUntil(trip.startDate);
-  if (days < 0) return "Em andamento";
   if (days === 0) return "Comeca hoje";
-  if (days <= 30) return `Faltam ${days} dias`;
   return `Faltam ${days} dias`;
 }
 
 function countdownLabel(trip) {
+  const temporalStatus = tripUtils.temporalStatus(trip, todayKey());
+  if (temporalStatus === "Em andamento") return "viagem em andamento";
+  if (temporalStatus === "Concluida") return "viagem concluida";
   const days = daysUntil(trip.startDate);
-  if (days < 0 && trip.endDate >= todayKey()) return "viagem em andamento";
-  if (days < 0) return "viagem passada";
   if (days === 0) return "comeca hoje";
   return `faltam ${days} dias`;
 }
@@ -1126,19 +1554,15 @@ function statusClass(value) {
 }
 
 function formatMoney(value, currency) {
-  try {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: currency || "BRL" }).format(Number(value || 0));
-  } catch {
-    return `${currency || "BRL"} ${formatNumber(value)}`;
-  }
+  return finance.formatCurrency(value, currency || "BRL");
 }
 
 function formatNumber(value) {
-  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
+  return finance.formatNumber(value);
 }
 
 function formatDate(key) {
-  return dateFormatter.format(dateFromKey(key));
+  return finance.formatDate(key);
 }
 
 function formatShortDate(key) {

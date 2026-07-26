@@ -88,6 +88,29 @@
 
         <section class="summary-grid" id="patrimonySummary" aria-label="Resumo do patrimonio"></section>
 
+        <section class="panel investment-detail-panel" id="investmentDetail" aria-live="polite" hidden>
+          <div class="panel-header investment-detail-header">
+            <div>
+              <p class="eyebrow" id="investmentDetailKicker">Investimento</p>
+              <h2 id="investmentDetailTitle">Detalhes do investimento</h2>
+              <p class="patrimony-note" id="investmentDetailMeta"></p>
+            </div>
+            <div class="investment-detail-actions">
+              <button class="compact-button" id="openMovementForm">
+                <i data-lucide="arrow-left-right"></i>
+                Aporte ou resgate
+              </button>
+              <button class="icon-button" id="editDetailedInvestment" title="Editar investimento" aria-label="Editar investimento">
+                <i data-lucide="pencil"></i>
+              </button>
+              <button class="icon-button" id="closeInvestmentDetail" title="Fechar detalhes" aria-label="Fechar detalhes">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+          </div>
+          <div id="investmentDetailContent"></div>
+        </section>
+
         <section class="focus-grid">
           <section class="panel">
             <div class="panel-header">
@@ -173,13 +196,69 @@
           </label>
         </div>
 
+        <section class="investment-form-fields" id="investmentFormFields">
+          <div class="form-section-heading">
+            <div>
+              <p class="eyebrow">Rentabilidade</p>
+              <h3>Dados para projecao</h3>
+            </div>
+            <span>Sem taxa cadastrada, o Planner nao inventa rendimentos.</span>
+          </div>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>Status</span>
+              <select id="assetStatus">
+                <option value="Ativo">Ativo</option>
+                <option value="Encerrado">Encerrado</option>
+                <option value="Resgatado">Resgatado</option>
+                <option value="Inativo">Inativo</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Tipo de rentabilidade</span>
+              <input id="assetReturnType" type="text" placeholder="Prefixada, CDI, IPCA+..." />
+            </label>
+          </div>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>Taxa efetiva cadastrada (%)</span>
+              <input id="assetReturnRate" type="number" step="0.0001" placeholder="8,42" />
+            </label>
+            <label class="field">
+              <span>Periodo da taxa</span>
+              <select id="assetReturnRatePeriod">
+                <option value="Anual">Anual efetiva</option>
+                <option value="Mensal">Mensal</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>Data de inicio</span>
+              <input id="assetStartDate" type="date" />
+            </label>
+            <label class="field">
+              <span>Data de vencimento</span>
+              <input id="assetMaturityDate" type="date" />
+            </label>
+          </div>
+
+          <label class="field" id="assetClosedDateField">
+            <span>Data de encerramento ou resgate</span>
+            <input id="assetClosedDate" type="date" />
+          </label>
+        </section>
+
         <div class="form-grid">
           <label class="field">
             <span>Valor atual</span>
             <input id="assetCurrentValue" type="number" min="0" step="0.01" required />
           </label>
           <label class="field">
-            <span>Valor investido</span>
+            <span>Valor inicialmente investido</span>
             <input id="assetInvestedValue" type="number" min="0" step="0.01" />
           </label>
         </div>
@@ -220,6 +299,55 @@
           <button class="primary-button" type="submit">
             <i data-lucide="save"></i>
             Salvar item
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="movementDialog">
+      <form class="modal-body" id="movementForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Investimento</p>
+            <h2 id="movementDialogTitle">Registrar movimento</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="movementDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="movementId" />
+        <input type="hidden" id="movementAssetId" />
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Tipo</span>
+            <select id="movementType" required>
+              <option value="Aporte">Aporte</option>
+              <option value="Resgate">Resgate</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Valor</span>
+            <input id="movementAmount" type="number" min="0.01" step="0.01" required />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Data</span>
+          <input id="movementDate" type="date" required />
+        </label>
+
+        <label class="field">
+          <span>Observacao</span>
+          <textarea id="movementNotes" rows="3" placeholder="Opcional"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" data-close-dialog="movementDialog">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Salvar movimento
           </button>
         </div>
       </form>
@@ -279,6 +407,9 @@
     </dialog>
 
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./financial-utils.js"></script>
+    <script src="./investment-view.js"></script>
+    <script src="./chart-utils.js"></script>
     <script src="./patrimonio.js"></script>
   </body>
 </html>

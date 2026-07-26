@@ -770,6 +770,624 @@ h3 {
   border-left-color: var(--red);
 }
 
+.trip-selector-panel {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(320px, 1.2fr) auto;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-soft);
+}
+
+.trip-selector-control,
+.selected-trip-identity {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.trip-selector-control > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.trip-selector-control select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: 0;
+  background: #ffffff;
+}
+
+.selected-trip-identity > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.selected-trip-identity strong {
+  overflow: hidden;
+  font-size: 1.05rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-trip-identity > span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.trip-card.is-current {
+  border-left: 5px solid var(--green);
+}
+
+.selected-trip-summary {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  color: #ffffff;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.13) 0 1px, transparent 1px 100%),
+    linear-gradient(135deg, #155a9a, #2478c7 62%, #2f8b80);
+  background-size: 34px 100%, 100% 100%;
+  box-shadow: 0 16px 34px rgba(21, 90, 154, 0.2);
+}
+
+.selected-trip-summary-heading,
+.chart-card-header,
+.category-summary-heading,
+.expense-day-heading,
+.investment-detail-actions,
+.investment-status-line,
+.form-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.selected-trip-summary .eyebrow,
+.selected-trip-summary p {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.selected-trip-summary h2,
+.selected-trip-summary p {
+  margin-bottom: 4px;
+}
+
+.selected-trip-budget {
+  display: grid;
+  gap: 3px;
+  text-align: right;
+}
+
+.selected-trip-budget strong {
+  font-size: 1.6rem;
+}
+
+.selected-trip-budget span,
+.selected-trip-budget small {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.budget-progress {
+  overflow: hidden;
+  height: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.budget-progress > span {
+  display: block;
+  width: var(--budget-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: #8ee0c9;
+}
+
+.budget-progress.budget-near > span,
+.category-track.budget-near .category-fill,
+.budget-comparison-track .budget-near {
+  background: var(--amber);
+}
+
+.budget-progress.budget-over > span,
+.category-track.budget-over .category-fill,
+.budget-comparison-track .budget-over {
+  background: var(--red);
+}
+
+.category-track.budget-within .category-fill {
+  background: var(--green);
+}
+
+.trip-metric-grid,
+.investment-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.trip-metric-grid .summary-card {
+  min-height: 122px;
+}
+
+.trip-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.chart-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(33, 87, 139, 0.06);
+}
+
+.chart-card-wide {
+  grid-column: 1 / -1;
+}
+
+.chart-card-header {
+  margin-bottom: 12px;
+}
+
+.chart-card-header > span,
+.projection-rate-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.chart-shell {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.chart-shell canvas {
+  display: block;
+  width: 100%;
+  min-height: 240px;
+}
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  gap: 4px;
+  min-width: 150px;
+  padding: 9px 11px;
+  color: #ffffff;
+  border-radius: 7px;
+  background: rgba(18, 59, 97, 0.96);
+  box-shadow: 0 12px 28px rgba(18, 59, 97, 0.22);
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+}
+
+.chart-tooltip span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+
+.chart-tooltip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tooltip-color);
+}
+
+.horizontal-chart,
+.budget-comparison {
+  display: grid;
+  gap: 12px;
+}
+
+.horizontal-chart-row {
+  display: grid;
+  gap: 7px;
+}
+
+.horizontal-chart-track,
+.budget-comparison-track {
+  overflow: hidden;
+  height: 12px;
+  border-radius: 999px;
+  background: #e9f2fb;
+}
+
+.horizontal-chart-track > span {
+  display: block;
+  width: var(--chart-fill, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--chart-color, var(--blue));
+}
+
+.budget-comparison-track > span {
+  display: block;
+  width: var(--comparison-width, 0%);
+  height: 100%;
+  border-radius: inherit;
+}
+
+.budget-comparison-track .is-budget {
+  background: var(--blue);
+}
+
+.budget-comparison-track .is-spent {
+  background: var(--green);
+}
+
+.budget-comparison-track .is-spent.budget-near {
+  background: var(--amber);
+}
+
+.budget-comparison-track .is-spent.budget-over {
+  background: var(--red);
+}
+
+.budget-comparison p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.expense-filter-panel {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(2, minmax(150px, 0.8fr)) repeat(2, minmax(132px, 0.65fr)) minmax(160px, 0.8fr);
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.expense-filter-panel .ghost-button {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.expense-category-overview {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.category-summary-row {
+  display: grid;
+  gap: 7px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.category-summary-row:last-child {
+  border-bottom: 0;
+}
+
+.expense-day-list,
+.expense-day-items {
+  display: grid;
+  gap: 10px;
+}
+
+.expense-day-group {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(248, 251, 255, 0.72);
+}
+
+.expense-day-heading {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.expense-day-heading .eyebrow,
+.expense-day-heading h3 {
+  margin-bottom: 0;
+}
+
+.field-warning {
+  margin: -2px 0 0;
+  padding: 10px 12px;
+  color: #805815;
+  border: 1px solid #efd7a5;
+  border-radius: 8px;
+  background: var(--amber-soft);
+  font-size: 0.86rem;
+}
+
+.investment-detail-panel {
+  margin-bottom: 18px;
+}
+
+.investment-detail-header {
+  align-items: flex-start;
+}
+
+.investment-detail-actions {
+  justify-content: flex-end;
+}
+
+.investment-hero,
+.investment-chart-section,
+.investment-evolution-section,
+.investment-movements {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.investment-hero {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.investment-status-line {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.investment-status-ativo {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.investment-status-encerrado,
+.investment-status-resgatado,
+.investment-status-inativo {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.investment-metric {
+  min-width: 0;
+  min-height: 118px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.investment-metric .summary-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 12px;
+  place-items: center;
+  color: var(--blue-deep);
+  border-radius: 8px;
+  background: var(--blue-soft);
+}
+
+.investment-metric > span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.investment-metric > strong {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  font-size: 1.12rem;
+}
+
+.investment-metric.is-realized {
+  border-left: 4px solid var(--green);
+}
+
+.investment-metric.is-projected {
+  border-left: 4px dashed var(--blue);
+}
+
+.projection-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 13px;
+  color: #805815;
+  border: 1px solid #efd7a5;
+  border-radius: 8px;
+  background: var(--amber-soft);
+  font-size: 0.86rem;
+}
+
+.projection-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 8px 0;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.projection-empty-state h3,
+.projection-empty-state p {
+  margin-bottom: 4px;
+}
+
+.projection-empty-state p {
+  color: var(--muted);
+}
+
+.projection-periods,
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.investment-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.investment-table {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.investment-table th,
+.investment-table td {
+  padding: 11px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.investment-table th:first-child,
+.investment-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+  background: #ffffff;
+}
+
+.investment-table thead th {
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 0.78rem;
+}
+
+.investment-table tbody tr:last-child th,
+.investment-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.investment-month-cards {
+  display: none;
+}
+
+.investment-month-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.investment-month-card summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px;
+  cursor: pointer;
+}
+
+.investment-month-card summary span {
+  display: grid;
+  gap: 3px;
+}
+
+.investment-month-card summary small {
+  color: var(--muted);
+}
+
+.investment-month-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 13px 13px;
+}
+
+.investment-month-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.investment-month-card dt {
+  color: var(--muted);
+}
+
+.investment-month-card dd {
+  margin: 0;
+  text-align: right;
+}
+
+.movement-list {
+  display: grid;
+  gap: 8px;
+}
+
+.movement-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.movement-row.movement-resgate {
+  border-left-color: var(--red);
+}
+
+.investment-form-fields {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.form-section-heading {
+  align-items: flex-start;
+}
+
+.form-section-heading > span {
+  max-width: 280px;
+  color: var(--muted);
+  text-align: right;
+  font-size: 0.8rem;
+}
+
+.asset-row.is-active {
+  border-color: #9fc7eb;
+  box-shadow: 0 14px 26px rgba(36, 120, 199, 0.12);
+}
+
 .choice-grid {
   display: flex;
   gap: 8px;
@@ -863,6 +1481,26 @@ h3 {
 .owner-pill {
   color: var(--muted);
   background: var(--surface-strong);
+}
+
+.status-em-andamento {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.status-futura {
+  color: var(--blue-deep);
+  background: var(--blue-soft);
+}
+
+.status-concluida {
+  color: var(--muted);
+  background: #edf2f7;
+}
+
+.status-arquivada {
+  color: var(--red);
+  background: var(--red-soft);
 }
 
 .bill-list,
@@ -1532,6 +2170,7 @@ h3 {
 .field input:focus,
 .field select:focus,
 .field textarea:focus,
+.trip-selector-control select:focus,
 .icon-button:focus-visible,
 .text-button:focus-visible,
 .compact-button:focus-visible,
@@ -1540,6 +2179,7 @@ h3 {
 .ghost-button:focus-visible,
 .danger-button:focus-visible,
 .actor-button:focus-visible,
+.tab-button:focus-visible,
 .fab:focus-visible {
   outline: 3px solid rgba(36, 120, 199, 0.24);
   outline-offset: 2px;
@@ -1570,6 +2210,24 @@ h3 {
   .goal-strip-side {
     border-top: 1px solid var(--line);
     border-left: 0;
+  }
+
+  .trip-selector-panel {
+    grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  }
+
+  .trip-selector-panel > .compact-button {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  .trip-metric-grid,
+  .investment-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .expense-filter-panel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1717,6 +2375,74 @@ h3 {
     grid-template-columns: 1fr;
   }
 
+  .trip-selector-panel,
+  .trip-charts-grid,
+  .expense-filter-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-selector-panel {
+    align-items: stretch;
+  }
+
+  .trip-selector-panel > .compact-button,
+  .expense-filter-panel .ghost-button {
+    grid-column: auto;
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .selected-trip-identity > div,
+  .selected-trip-summary-heading,
+  .chart-card-header,
+  .expense-day-heading,
+  .investment-detail-actions,
+  .form-section-heading,
+  .projection-empty-state {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .selected-trip-identity strong {
+    white-space: normal;
+  }
+
+  .selected-trip-budget {
+    text-align: left;
+  }
+
+  .trip-metric-grid,
+  .investment-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trip-charts-grid .chart-card-wide {
+    grid-column: auto;
+  }
+
+  .chart-shell canvas {
+    min-height: 220px;
+  }
+
+  .investment-table-wrap {
+    display: none;
+  }
+
+  .investment-month-cards {
+    display: grid;
+    gap: 9px;
+  }
+
+  .investment-detail-actions > button,
+  .projection-empty-state > button {
+    width: 100%;
+  }
+
+  .form-section-heading > span {
+    max-width: none;
+    text-align: left;
+  }
+
   .goal-strip-side {
     align-items: stretch;
     flex-direction: column;
@@ -1749,9 +2475,10 @@ h3 {
     font-size: 1.9rem;
   }
 
-.bill-row,
-.asset-row,
+  .bill-row,
+  .asset-row,
   .travel-row,
+  .movement-row,
   .transaction-row,
   .insight-item,
   .revenue-row,
@@ -1788,5 +2515,23 @@ h3 {
     bottom: 154px;
     left: 14px;
     max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .trip-metric-grid,
+  .investment-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .projection-periods,
+  .chart-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .projection-periods > button,
+  .chart-controls > label {
+    width: 100%;
   }
 }

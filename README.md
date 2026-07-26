@@ -1,6 +1,6 @@
 # Planner financeiro
 
-Primeira versao local de uma agenda financeira compartilhada.
+Agenda financeira compartilhada com persistencia local em SQLite.
 
 Agora os dados ficam em SQLite, nao mais apenas no navegador.
 
@@ -65,6 +65,8 @@ Tabelas principais:
 - `bills`
 - `revenues`
 - `assets`
+- `asset_movements`
+- `asset_balance_snapshots`
 - `financial_goals`
 - `card_statements`
 - `card_transactions`
@@ -90,6 +92,26 @@ A area de patrimonio acompanha uma meta separada do total de bens cadastrados. O
 
 O Planner calcula automaticamente o ritmo mensal necessario, a projecao para a data e a diferenca entre o aporte planejado e o aporte exigido. A meta tambem aparece no painel mensal junto do check-in do casal.
 
+## Investimentos
+
+Os itens dos tipos **Investimento** e **Reserva** podem guardar:
+
+- valor inicialmente investido e saldo atual;
+- data de inicio, referencia, vencimento e encerramento;
+- status do investimento;
+- taxa mensal ou anual efetiva;
+- tipo de rentabilidade;
+- aportes e resgates adicionais;
+- snapshots de saldo realizados.
+
+A tela de detalhes separa os saldos realizados das projecoes futuras e mostra a evolucao em 6, 12, 24 meses ou ate o vencimento. A taxa anual efetiva e convertida para a taxa mensal equivalente com:
+
+```text
+taxaMensal = (1 + taxaAnual)^(1/12) - 1
+```
+
+Os calculos usam juros compostos. Aportes e resgates posteriores ao saldo de referencia entram no proximo fechamento mensal. Quando nao existe taxa suficiente para projetar, o Planner mostra uma orientacao para editar o investimento em vez de criar uma taxa ficticia.
+
 ## Viagens
 
 A area **Viagens** adiciona planejamento de viagem integrado ao Planner Financeiro:
@@ -101,6 +123,10 @@ A area **Viagens** adiciona planejamento de viagem integrado ao Planner Financei
 - parcelamentos com opcao de gerar contas no Planner;
 - reservas, roteiro, checklist e documentos;
 - relatorio de orcamento, pagamentos e acerto entre viajantes.
+- seletor persistente da viagem atual, com sugestao automatica da viagem em andamento;
+- resumo de orcamento, gasto realizado, saldo, media diaria e estimativa final;
+- gastos agrupados por dia, busca, filtros e ordenacao;
+- resumo por categoria e graficos de categoria, gastos diarios, orcamento e acumulado.
 
 Quando uma despesa parcelada e enviada para o Planner, cada parcela gera uma conta vinculada. Ao excluir a despesa ou a viagem, as contas vinculadas tambem sao removidas para evitar duplicidade.
 
@@ -144,6 +170,24 @@ Passos:
 6. Gerar um dominio publico no servico.
 
 Sem volume, o deploy funciona, mas os dados podem ser perdidos entre redeploys.
+
+## Validacao
+
+Checagem de sintaxe:
+
+```powershell
+npm run check
+```
+
+Testes unitarios e de integracao:
+
+```powershell
+npm test
+```
+
+Os testes de integracao iniciam o servidor com um banco SQLite temporario. Eles nao alteram `data/planner-financeiro.sqlite`.
+
+Para criar a antiga viagem de demonstracao somente em um ambiente de desenvolvimento vazio, defina `PLANNER_SEED_DEMO_TRIP=1` antes de iniciar o servidor. O seed fica desligado por padrao.
 
 ## Login
 
