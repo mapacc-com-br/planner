@@ -236,6 +236,12 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (method === "PATCH" && parts[1] === "card-transactions" && parts[2]) {
+    const cardTransaction = updateCardTransaction(pathParam(parts[2]), await readJson(request));
+    sendJson(response, 200, { transaction: cardTransaction });
+    return;
+  }
+
   if (method === "DELETE" && parts[1] === "card-statements" && parts[2]) {
     db.prepare("delete from card_statements where id = ?").run(pathParam(parts[2]));
     sendJson(response, 200, { ok: true });
@@ -593,6 +599,7 @@ function initializeDatabase() {
     create table if not exists card_transactions (
       id text primary key,
       statement_id text not null references card_statements(id) on delete cascade,
+      trip_id text references trips(id) on delete set null,
       purchase_date text not null check (purchase_date glob '????-??-??'),
       description text not null check (length(trim(description)) > 0),
       category text not null check (length(trim(category)) > 0),
@@ -896,6 +903,8 @@ function initializeDatabase() {
   ensureColumn("assets", "return_rate_micros", "integer");
   ensureColumn("assets", "return_rate_period", "text check (return_rate_period is null or return_rate_period in ('Mensal', 'Anual'))");
   ensureColumn("assets", "return_type", "text not null default ''");
+  ensureColumn("card_transactions", "trip_id", "text references trips(id) on delete set null");
+  db.exec("create index if not exists idx_card_transactions_trip on card_transactions(trip_id)");
 
   transaction(() => {
     db.prepare("insert or ignore into users (id, name) values (?, ?)").run("andre", "Andre");
@@ -1904,14 +1913,16 @@ function saveCardStatement(statement) {
 
     const transactionStmt = db.prepare(
       `insert into card_transactions (
-        id, statement_id, purchase_date, description, category, amount_cents, installments, owner, notes
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, statement_id, trip_id, purchase_date, description, category, amount_cents, installments, owner, notes
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     statement.transactions.forEach((item) => {
+      if (item.tripId) assertTripExists(item.tripId);
       transactionStmt.run(
         item.id,
         statement.id,
+        item.tripId,
         item.purchaseDate,
         item.description,
         item.category,
@@ -1938,7 +1949,7 @@ function getCardStatements() {
 
   const transactions = db
     .prepare(
-      `select id, statement_id, purchase_date, description, category, amount_cents, installments, owner, notes
+      `select id, statement_id, trip_id, purchase_date, description, category, amount_cents, installments, owner, notes
          from card_transactions
         order by purchase_date asc, description asc`,
     )
@@ -1959,6 +1970,29 @@ function getCardStatements() {
 
 function getCardStatement(id) {
   return getCardStatements().find((statement) => statement.id === id) || null;
+}
+
+function getCardTransaction(id) {
+  const row = db
+    .prepare(
+      `select id, statement_id, trip_id, purchase_date, description, category, amount_cents, installments, owner, notes
+         from card_transactions
+        where id = ?`,
+    )
+    .get(id);
+  return row ? rowToCardTransaction(row) : null;
+}
+
+function updateCardTransaction(id, raw) {
+  const existing = getCardTransaction(id);
+  if (!existing) throw new Error("Compra do cartao nao encontrada.");
+
+  const category = raw.category == null ? existing.category : cleanText(raw.category, "category");
+  const tripId = raw.tripId === undefined ? existing.tripId : String(raw.tripId || "").trim() || null;
+  if (tripId) assertTripExists(tripId);
+
+  db.prepare("update card_transactions set category = ?, trip_id = ? where id = ?").run(category, tripId, id);
+  return getCardTransaction(id);
 }
 
 function getBill(id) {
@@ -2203,6 +2237,7 @@ function normalizeCardTransaction(raw) {
   const amount = Number(raw.amount);
   const purchaseDate = String(raw.purchaseDate || raw.date || "");
   const owner = raw.owner || "Ambos";
+  const tripId = String(raw.tripId || "").trim() || null;
 
   if (!Number.isFinite(amount)) throw new Error("Valor de transacao invalido.");
   assertDate(purchaseDate, "purchaseDate");
@@ -2217,6 +2252,7 @@ function normalizeCardTransaction(raw) {
     installments: String(raw.installments || "").trim(),
     owner,
     notes: String(raw.notes || "").trim(),
+    tripId,
   };
 }
 
@@ -2592,6 +2628,7 @@ function rowToCardTransaction(row) {
   return {
     id: row.id,
     statementId: row.statement_id,
+    tripId: row.trip_id || null,
     purchaseDate: row.purchase_date,
     description: row.description,
     category: row.category,

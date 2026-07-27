@@ -191,14 +191,58 @@ test("rejeita gasto com valor igual a zero", async () => {
   assert.match(payload.details, /maior que zero/);
 });
 
+test("salva e edita o vinculo entre compra do cartao e viagem", async () => {
+  const statement = {
+    id: "card-statement-test",
+    label: "Fatura teste",
+    cardName: "Cartao teste",
+    closingDate: "2026-08-01",
+    dueDate: "2026-08-10",
+    importedBy: "Andre",
+    transactions: [
+      {
+        id: "card-transaction-test",
+        purchaseDate: "2026-07-20",
+        description: "Hotel Curitiba",
+        category: "Viagem",
+        amount: 480,
+        owner: "Ambos",
+        tripId: "trip-test",
+      },
+    ],
+  };
+
+  await request("/api/card-statements", { method: "POST", body: statement });
+  let state = await request("/api/card-statements");
+  let transaction = state.statements.find((item) => item.id === statement.id).transactions[0];
+  assert.equal(transaction.tripId, "trip-test");
+
+  const updated = await request("/api/card-transactions/card-transaction-test", {
+    method: "PATCH",
+    body: { category: "Hospedagem", tripId: null },
+  });
+  assert.equal(updated.transaction.category, "Hospedagem");
+  assert.equal(updated.transaction.tripId, null);
+
+  state = await request("/api/card-statements");
+  transaction = state.statements.find((item) => item.id === statement.id).transactions[0];
+  assert.equal(transaction.category, "Hospedagem");
+  assert.equal(transaction.tripId, null);
+
+  await request(`/api/card-statements/${statement.id}`, { method: "DELETE" });
+});
+
 test("serve as telas com os utilitarios compartilhados", async () => {
   const patrimony = await fetch(`${baseUrl}/patrimonio.html`).then((response) => response.text());
   const trips = await fetch(`${baseUrl}/viagens.html`).then((response) => response.text());
+  const card = await fetch(`${baseUrl}/cartao.html`).then((response) => response.text());
 
   assert.match(patrimony, /investmentDetailContent/);
   assert.match(patrimony, /financial-utils\.js/);
   assert.match(trips, /tripSelector/);
   assert.match(trips, /trip-utils\.js/);
+  assert.match(card, /invoiceTrendChart/);
+  assert.match(card, /card-utils\.js/);
 });
 
 async function request(pathname, options = {}) {

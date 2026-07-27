@@ -79,21 +79,10 @@
 
         <section class="month-strip travel-strip" aria-label="Planejamento de viagens">
           <div>
-            <p class="eyebrow">Mapa de viagens</p>
-            <h2>Planejar, pagar e viajar com clareza</h2>
+            <p class="eyebrow">Viagem selecionada</p>
+            <h2>O essencial da viagem, em um so lugar</h2>
           </div>
           <div class="trip-toolbar">
-            <input id="tripSearch" type="search" placeholder="Buscar viagem ou destino" />
-            <select id="tripStatusFilter" aria-label="Filtrar viagens">
-              <option value="active">Proximas e em andamento</option>
-              <option value="Futura">Futuras</option>
-              <option value="Em andamento">Em andamento</option>
-              <option value="Concluida">Concluidas</option>
-              <option value="Arquivada">Arquivadas</option>
-              <option value="Planejamento">Em planejamento</option>
-              <option value="Confirmada">Confirmadas</option>
-              <option value="all">Todas</option>
-            </select>
             <button class="primary-button" id="openTripForm">
               <i data-lucide="plus"></i>
               Nova viagem
@@ -113,25 +102,37 @@
             </div>
             <span id="selectedTripMeta">O painel mostrara os gastos da viagem escolhida.</span>
           </div>
-          <button class="compact-button" id="openTripFormFromSelector">
-            <i data-lucide="plus"></i>
-            Nova viagem
-          </button>
         </section>
 
-        <section class="summary-grid" id="tripSummary" aria-label="Resumo de viagens"></section>
+        <section class="summary-grid travel-summary-grid" id="tripSummary" aria-label="Resumo de viagens"></section>
 
-        <section class="travel-layout">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">Viagens</p>
-                <h3>Planejadas e recentes</h3>
-              </div>
+        <section class="travel-layout travel-layout-minimal">
+          <details class="panel trip-library">
+            <summary class="trip-library-summary">
+              <span class="summary-icon" aria-hidden="true"><i data-lucide="library"></i></span>
+              <span>
+                <strong>Todas as viagens</strong>
+                <small>Buscar, editar ou abrir outra viagem</small>
+              </span>
               <span class="count-pill" id="tripCount">0</span>
+            </summary>
+            <div class="trip-library-body">
+              <div class="filter-bar trip-library-filters">
+                <input id="tripSearch" type="search" placeholder="Buscar viagem ou destino" />
+                <select id="tripStatusFilter" aria-label="Filtrar viagens">
+                  <option value="active">Proximas e em andamento</option>
+                  <option value="Futura">Futuras</option>
+                  <option value="Em andamento">Em andamento</option>
+                  <option value="Concluida">Concluidas</option>
+                  <option value="Arquivada">Arquivadas</option>
+                  <option value="Planejamento">Em planejamento</option>
+                  <option value="Confirmada">Confirmadas</option>
+                  <option value="all">Todas</option>
+                </select>
+              </div>
+              <div class="trip-card-list" id="tripList"></div>
             </div>
-            <div class="trip-card-list" id="tripList"></div>
-          </section>
+          </details>
 
           <section class="panel trip-detail-panel" id="tripDetail" hidden>
             <div class="panel-header trip-detail-header">

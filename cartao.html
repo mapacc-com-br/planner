@@ -84,10 +84,11 @@
           </div>
         </header>
 
-        <section class="month-strip card-strip" aria-label="Resumo do cartao">
+        <section class="month-strip card-strip card-hero" aria-label="Resumo do cartao">
           <div>
-            <p class="eyebrow">BI domestico do cartao</p>
+            <p class="eyebrow">Fatura do mes</p>
             <h2 id="statementTitle">Nenhuma fatura importada</h2>
+            <p class="hero-support" id="statementMeta">Importe uma fatura para comecar.</p>
           </div>
           <div class="statement-tools">
             <select id="statementSelect" aria-label="Selecionar fatura"></select>
@@ -97,113 +98,166 @@
           </div>
         </section>
 
-        <section class="summary-grid" id="cardSummary" aria-label="Resumo da fatura"></section>
+        <section class="summary-grid card-kpi-grid" id="cardSummary" aria-label="Resumo da fatura"></section>
 
-        <section class="focus-grid card-workspace">
-          <section class="panel import-panel">
-            <div class="panel-header">
+        <section class="card-charts-grid" aria-label="Graficos da fatura">
+          <article class="chart-card">
+            <div class="chart-card-header">
               <div>
-                <p class="eyebrow">Entrada</p>
-                <h3>Colar fatura estruturada</h3>
+                <p class="eyebrow">Ritmo da fatura</p>
+                <h3>Como os gastos cresceram</h3>
               </div>
-              <span class="count-pill" id="previewCount">0 linhas</span>
+              <span id="invoiceComparisonLabel">Mes atual</span>
             </div>
+            <div class="chart-shell card-chart-shell">
+              <canvas id="invoiceTrendChart" role="img" aria-label="Evolucao acumulada da fatura"></canvas>
+            </div>
+          </article>
 
-            <form class="statement-form" id="statementForm">
-              <div class="form-grid">
-                <label class="field">
-                  <span>Nome da fatura</span>
-                  <input id="statementLabel" required />
-                </label>
-                <label class="field">
-                  <span>Cartao</span>
-                  <input id="cardName" value="Cartao principal" required />
-                </label>
+          <article class="chart-card">
+            <div class="chart-card-header">
+              <div>
+                <p class="eyebrow">Categorias</p>
+                <h3>Onde gastamos mais</h3>
               </div>
+              <span id="categoryChartLabel">Sem dados</span>
+            </div>
+            <div class="chart-shell card-chart-shell">
+              <canvas id="categorySpendChart" role="img" aria-label="Gastos por categoria"></canvas>
+            </div>
+          </article>
+        </section>
 
-              <div class="form-grid">
-                <label class="field">
-                  <span>Fechamento</span>
-                  <input id="closingDate" type="date" />
-                </label>
-                <label class="field">
-                  <span>Vencimento</span>
-                  <input id="dueDate" type="date" />
-                </label>
-              </div>
+        <section class="card-insight-grid" id="cardInsights" aria-label="Insights da fatura"></section>
 
-              <label class="field wide-field">
-                <span>Linhas da fatura</span>
-                <textarea id="statementPaste" rows="11" placeholder="Data | Descricao | Categoria | Valor | Parcelas | Responsavel | Observacao"></textarea>
+        <section class="panel card-trip-panel">
+          <div class="panel-header card-trip-header">
+            <div>
+              <p class="eyebrow">Viagem em destaque</p>
+              <h3>Compras ligadas a uma viagem</h3>
+            </div>
+            <label class="inline-select">
+              <span class="sr-only">Selecionar viagem</span>
+              <select id="cardTripSelect" aria-label="Selecionar viagem"></select>
+            </label>
+          </div>
+          <div id="cardTravelSummary"></div>
+        </section>
+
+        <section class="panel card-transactions-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Compras</p>
+              <h3>Detalhes da fatura</h3>
+            </div>
+            <div class="filter-bar">
+              <input id="transactionSearch" type="search" placeholder="Buscar compra" aria-label="Buscar gasto" />
+              <select id="categoryFilter" aria-label="Filtrar categoria"></select>
+            </div>
+          </div>
+          <div class="transaction-list" id="transactionList"></div>
+        </section>
+
+        <details class="panel statement-import">
+          <summary class="statement-import-summary">
+            <span class="summary-icon" aria-hidden="true"><i data-lucide="file-up"></i></span>
+            <span>
+              <strong>Importar outra fatura</strong>
+              <small>Cole os dados quando precisar. O painel continua limpo no dia a dia.</small>
+            </span>
+            <span class="count-pill" id="previewCount">0 linhas</span>
+          </summary>
+
+          <form class="statement-form statement-import-form" id="statementForm">
+            <div class="form-grid">
+              <label class="field">
+                <span>Nome da fatura</span>
+                <input id="statementLabel" required />
               </label>
-
-              <div class="modal-actions">
-                <button class="ghost-button" id="previewStatement" type="button">
-                  <i data-lucide="sparkles"></i>
-                  Pre-visualizar
-                </button>
-                <button class="primary-button" type="submit">
-                  <i data-lucide="save"></i>
-                  Salvar fatura
-                </button>
-              </div>
-            </form>
-          </section>
-
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">Leitura</p>
-                <h3>O que chama atencao</h3>
-              </div>
+              <label class="field">
+                <span>Cartao</span>
+                <input id="cardName" value="Cartao principal" required />
+              </label>
             </div>
-            <div class="insight-list" id="cardInsights"></div>
-          </section>
-        </section>
 
-        <section class="ledger-grid">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">Extrato</p>
-                <h3>Gastos da fatura</h3>
-              </div>
-              <div class="filter-bar">
-                <input id="transactionSearch" type="search" placeholder="Buscar" aria-label="Buscar gasto" />
-                <select id="categoryFilter" aria-label="Filtrar categoria"></select>
-              </div>
+            <div class="form-grid form-grid-three">
+              <label class="field">
+                <span>Fechamento</span>
+                <input id="closingDate" type="date" />
+              </label>
+              <label class="field">
+                <span>Vencimento</span>
+                <input id="dueDate" type="date" />
+              </label>
+              <label class="field">
+                <span>Viagem padrao, se houver</span>
+                <select id="defaultTripSelect"></select>
+              </label>
             </div>
-            <div class="transaction-list" id="transactionList"></div>
-          </section>
 
-          <section class="side-stack">
-            <section class="panel">
-              <div class="panel-header">
-                <div>
-                  <p class="eyebrow">Categorias</p>
-                  <h3>Onde pesou</h3>
-                </div>
-              </div>
-              <div class="category-map" id="cardCategoryMap"></div>
-            </section>
+            <label class="field wide-field">
+              <span>Linhas da fatura</span>
+              <textarea
+                id="statementPaste"
+                rows="9"
+                placeholder="Data | Descricao | Categoria | Valor | Parcelas | Responsavel | Observacao | Viagem"
+              ></textarea>
+            </label>
 
-            <section class="panel">
-              <div class="panel-header">
-                <div>
-                  <p class="eyebrow">Estabelecimentos</p>
-                  <h3>Maiores recorrencias</h3>
-                </div>
-              </div>
-              <div class="category-map" id="merchantMap"></div>
-            </section>
-          </section>
-        </section>
+            <p class="form-help">A viagem padrao sera aplicada a todas as linhas sem uma viagem informada na coluna opcional.</p>
+
+            <div class="modal-actions">
+              <button class="ghost-button" id="previewStatement" type="button">
+                <i data-lucide="sparkles"></i>
+                Pre-visualizar
+              </button>
+              <button class="primary-button" type="submit">
+                <i data-lucide="save"></i>
+                Salvar fatura
+              </button>
+            </div>
+          </form>
+        </details>
       </main>
 
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </div>
 
+    <dialog class="modal compact-modal" id="transactionDialog">
+      <form class="modal-body" id="transactionForm" method="dialog">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Organizar compra</p>
+            <h2 id="transactionDialogTitle">Compra</h2>
+          </div>
+          <button class="icon-button" type="button" id="closeTransactionDialog" title="Fechar" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="transactionId" />
+        <label class="field">
+          <span>Categoria</span>
+          <select id="transactionCategory"></select>
+        </label>
+        <label class="field">
+          <span>Viagem vinculada</span>
+          <select id="transactionTrip"></select>
+        </label>
+        <p class="form-help">O vinculo aparece no resumo da viagem e fica salvo no banco.</p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" id="cancelTransactionEdit">Cancelar</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            Salvar
+          </button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./card-utils.js"></script>
+    <script src="./chart-utils.js"></script>
     <script src="./cartao.js"></script>
   </body>
 </html>

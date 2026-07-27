@@ -576,6 +576,13 @@ h3 {
   font-size: 0.92rem;
 }
 
+.summary-card small {
+  display: block;
+  margin-top: 5px;
+  color: #8292a4;
+  font-size: 0.76rem;
+}
+
 .focus-grid,
 .ledger-grid {
   display: grid;
@@ -595,6 +602,276 @@ h3 {
 .side-stack {
   display: grid;
   gap: 18px;
+}
+
+.hero-support {
+  margin: 7px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.88rem;
+}
+
+.card-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.card-kpi-grid .summary-card {
+  min-height: 118px;
+  padding: 15px 16px;
+}
+
+.card-kpi-grid .summary-icon {
+  margin-bottom: 12px;
+}
+
+.card-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.card-chart-shell canvas {
+  min-height: 245px;
+}
+
+.card-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.card-insight {
+  min-height: 104px;
+  padding: 14px;
+  border-left-width: 1px;
+  box-shadow: none;
+}
+
+.card-insight.positive {
+  border-color: rgba(47, 139, 128, 0.28);
+}
+
+.card-insight.attention {
+  border-color: rgba(191, 91, 100, 0.3);
+}
+
+.card-insight.travel {
+  border-color: rgba(155, 106, 75, 0.3);
+}
+
+.card-trip-panel {
+  margin-bottom: 12px;
+}
+
+.card-trip-panel::before,
+.card-transactions-panel::before,
+.statement-import::before {
+  display: none;
+}
+
+.card-trip-header {
+  align-items: flex-end;
+}
+
+.inline-select select {
+  min-width: 230px;
+  min-height: 40px;
+  padding: 0 12px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.card-trip-overview {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.72fr) minmax(300px, 1fr);
+  gap: 18px 24px;
+}
+
+.card-trip-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-content: start;
+}
+
+.card-trip-identity .text-button {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.card-trip-identity h3 {
+  margin: 8px 0 4px;
+  font-size: 1.2rem;
+}
+
+.card-trip-identity p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.travel-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  color: #7d543c;
+  border-radius: 8px;
+  background: #f4ebe5;
+}
+
+.card-trip-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.card-trip-metrics > div {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.card-trip-metrics span,
+.card-trip-metrics strong {
+  display: block;
+}
+
+.card-trip-metrics span {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.card-trip-metrics strong {
+  font-size: 1.04rem;
+  overflow-wrap: anywhere;
+}
+
+.card-trip-breakdown {
+  grid-column: 1 / -1;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.card-trip-breakdown-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.card-trip-breakdown-heading > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.card-transactions-panel {
+  margin-bottom: 12px;
+}
+
+.trip-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 9px;
+  color: #7d543c;
+  border-radius: 8px;
+  background: #f4ebe5;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.trip-pill svg {
+  width: 14px;
+  height: 14px;
+}
+
+.statement-import {
+  margin-top: 12px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.statement-import-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 15px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.statement-import-summary::-webkit-details-marker {
+  display: none;
+}
+
+.statement-import-summary > .summary-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  color: var(--blue-deep);
+  border-radius: 8px;
+  background: var(--blue-soft);
+}
+
+.statement-import-summary strong,
+.statement-import-summary small {
+  display: block;
+}
+
+.statement-import-summary small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.statement-import-form {
+  display: grid;
+  gap: 14px;
+  padding: 4px 18px 18px;
+  border-top: 1px solid var(--line);
+}
+
+.form-help {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.compact-empty {
+  min-height: 110px;
+}
+
+.compact-empty > div {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.compact-empty p {
+  margin: 0;
+}
+
+.sr-only {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .travel-layout {
@@ -772,7 +1049,7 @@ h3 {
 
 .trip-selector-panel {
   display: grid;
-  grid-template-columns: minmax(280px, 0.8fr) minmax(320px, 1.2fr) auto;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(320px, 1.2fr);
   align-items: center;
   gap: 16px;
   margin-bottom: 18px;
@@ -782,6 +1059,81 @@ h3 {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: var(--shadow-soft);
+}
+
+.travel-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.travel-summary-grid .summary-card {
+  min-height: 108px;
+  padding: 15px 16px;
+}
+
+.travel-summary-grid .summary-icon {
+  margin-bottom: 11px;
+}
+
+.travel-layout-minimal {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.trip-library {
+  padding: 0;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.trip-library::before {
+  display: none;
+}
+
+.trip-library-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.trip-library-summary::-webkit-details-marker {
+  display: none;
+}
+
+.trip-library-summary > .summary-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  color: var(--blue-deep);
+  border-radius: 8px;
+  background: var(--blue-soft);
+}
+
+.trip-library-summary strong,
+.trip-library-summary small {
+  display: block;
+}
+
+.trip-library-summary small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.trip-library-body {
+  display: grid;
+  gap: 12px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--line);
+}
+
+.trip-library-filters {
+  justify-self: end;
+}
+
+.trip-library .trip-card-list {
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
 }
 
 .trip-selector-control,
@@ -838,11 +1190,8 @@ h3 {
   padding: 18px;
   color: #ffffff;
   border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.13) 0 1px, transparent 1px 100%),
-    linear-gradient(135deg, #155a9a, #2478c7 62%, #2f8b80);
-  background-size: 34px 100%, 100% 100%;
-  box-shadow: 0 16px 34px rgba(21, 90, 154, 0.2);
+  background: linear-gradient(135deg, #155a9a, #2478c7 74%, #2f8b80);
+  box-shadow: 0 12px 26px rgba(21, 90, 154, 0.16);
 }
 
 .selected-trip-summary-heading,
@@ -2066,6 +2415,14 @@ h3 {
   gap: 12px;
 }
 
+.form-grid.form-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.modal.compact-modal {
+  width: min(520px, calc(100vw - 24px));
+}
+
 .field {
   display: grid;
   gap: 7px;
@@ -2192,6 +2549,10 @@ h3 {
 @media (max-width: 1180px) {
   .summary-grid {
     grid-template-columns: repeat(3, minmax(170px, 1fr));
+  }
+
+  .card-kpi-grid {
+    grid-template-columns: repeat(2, minmax(170px, 1fr));
   }
 
   .focus-grid,
@@ -2365,6 +2726,7 @@ h3 {
   }
 
   .form-grid,
+  .form-grid.form-grid-three,
   .goal-strip,
   .checkin-grid,
   .financial-goal-metrics,
@@ -2373,6 +2735,40 @@ h3 {
   .travel-insight-grid,
   .mini-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .card-charts-grid,
+  .card-insight-grid,
+  .card-trip-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .card-trip-breakdown {
+    grid-column: auto;
+  }
+
+  .card-trip-header,
+  .card-trip-breakdown-heading,
+  .card-trip-identity {
+    align-items: stretch;
+  }
+
+  .inline-select,
+  .inline-select select {
+    width: 100%;
+  }
+
+  .card-trip-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .statement-import-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .statement-import-summary > .count-pill {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .trip-selector-panel,
@@ -2489,7 +2885,8 @@ h3 {
   .bill-actions,
   .asset-actions,
   .travel-actions,
-  .revenue-actions {
+  .revenue-actions,
+  .transaction-row .bill-actions {
     justify-content: flex-start;
   }
 

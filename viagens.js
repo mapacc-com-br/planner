@@ -1,6 +1,5 @@
 const STORAGE_KEYS = {
   selectedTrip: "plannerFinanceiro:selectedTrip",
-  tripTab: "plannerFinanceiro:tripTab",
 };
 
 const finance = window.PlannerFinance;
@@ -12,7 +11,7 @@ const shortDateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", mo
 
 let trips = [];
 let activeTripId = localStorage.getItem(STORAGE_KEYS.selectedTrip) || "";
-let activeTab = localStorage.getItem(STORAGE_KEYS.tripTab) || "overview";
+let activeTab = "overview";
 let currentActor = "Andre";
 let toastTimer = null;
 let savingExpense = false;
@@ -76,7 +75,6 @@ async function initializeTrips() {
 
 function bindEvents() {
   document.querySelector("#openTripForm").addEventListener("click", () => openTripDialog());
-  document.querySelector("#openTripFormFromSelector").addEventListener("click", () => openTripDialog());
   document.querySelector("#openExpenseForm").addEventListener("click", () => openExpenseDialog());
   document.querySelector("#openExpenseFormFloating").addEventListener("click", () => openExpenseDialog());
   document.querySelector("#editActiveTrip").addEventListener("click", () => openTripDialog(getActiveTrip()));
@@ -86,6 +84,7 @@ function bindEvents() {
   elements.tripStatusFilter.addEventListener("change", render);
   elements.tripSelector.addEventListener("change", () => {
     activeTripId = elements.tripSelector.value;
+    activeTab = "overview";
     localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
     resetExpenseFilters();
     render();
@@ -105,7 +104,6 @@ function bindEvents() {
   document.querySelectorAll("[data-trip-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       activeTab = button.dataset.tripTab;
-      localStorage.setItem(STORAGE_KEYS.tripTab, activeTab);
       renderActiveTrip();
     });
   });
@@ -166,6 +164,7 @@ function bindEvents() {
 async function handleAction(action, id) {
   if (action === "open-trip") {
     activeTripId = id;
+    activeTab = "overview";
     localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
     resetExpenseFilters();
     render();
@@ -217,7 +216,16 @@ async function syncSessionActor() {
 async function refreshTrips() {
   const state = await apiRequest("/api/trips");
   trips = Array.isArray(state.trips) ? state.trips : [];
-  activeTripId = tripUtils.restoreSelectedTripId(localStorage, STORAGE_KEYS.selectedTrip, trips, todayKey());
+  const requestedTripId = new URLSearchParams(window.location.search).get("trip");
+  activeTripId = trips.some((trip) => trip.id === requestedTripId)
+    ? requestedTripId
+    : tripUtils.restoreSelectedTripId(localStorage, STORAGE_KEYS.selectedTrip, trips, todayKey());
+  if (requestedTripId === activeTripId) {
+    activeTab = "overview";
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("trip");
+    window.history.replaceState({}, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+  }
   if (activeTripId) localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
 }
 
@@ -287,8 +295,6 @@ function renderTripSelector() {
 }
 
 function renderTripSummary() {
-  const visibleTrips = getFilteredTrips();
-  const openTrips = trips.filter((trip) => ["Futura", "Em andamento"].includes(tripUtils.temporalStatus(trip, todayKey()))).length;
   const selectedTrip = getActiveTrip();
   const selectedStats = selectedTrip ? tripStats(selectedTrip) : null;
   const nextTrip = trips
@@ -296,8 +302,6 @@ function renderTripSummary() {
     .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
 
   const items = [
-    { label: "Viagens ativas", value: openTrips, icon: "plane-takeoff", tone: "income", text: true },
-    { label: "Viagens encontradas", value: visibleTrips.length, icon: "list-filter", tone: "bills", text: true },
     {
       label: "Proxima viagem",
       value: nextTrip ? daysUntil(nextTrip.startDate) : "-",
@@ -307,11 +311,11 @@ function renderTripSummary() {
       text: true,
     },
     {
-      label: "Orcamento selecionado",
-      value: selectedTrip?.totalBudget || 0,
+      label: "Total gasto",
+      value: selectedStats?.realized || 0,
       currency: selectedTrip?.primaryCurrency || "BRL",
-      icon: "wallet-cards",
-      tone: "bills",
+      icon: "receipt-text",
+      tone: "paid",
     },
     {
       label: "Saldo selecionado",
@@ -454,12 +458,9 @@ function renderOverviewTab(trip) {
       </section>
 
       <div class="trip-metric-grid">
-        ${tripMetricCard("Orcamento total", formatMoney(trip.totalBudget, trip.primaryCurrency), "landmark", "income")}
         ${tripMetricCard("Total gasto", formatMoney(stats.realized, trip.primaryCurrency), "receipt-text", "paid")}
         ${tripMetricCard("Saldo disponivel", formatMoney(stats.available, trip.primaryCurrency), "badge-dollar-sign", stats.available >= 0 ? "balance" : "pending")}
-        ${tripMetricCard("Previsto ainda nao realizado", formatMoney(stats.forecast, trip.primaryCurrency), "wallet-cards", "bills")}
         ${tripMetricCard("Media de gastos por dia", formatMoney(stats.averagePerDay, trip.primaryCurrency), "calendar-days", "bills")}
-        ${tripMetricCard(stats.status === "Futura" ? "Dias para comecar" : "Dias restantes", String(stats.daysRemaining), "calendar-clock", "income")}
         ${tripMetricCard(
           "Estimativa ate o final",
           stats.estimatedFinalSpend == null ? "Dados insuficientes" : formatMoney(stats.estimatedFinalSpend, trip.primaryCurrency),
@@ -496,11 +497,10 @@ function tripMetricCard(label, value, icon, tone) {
 }
 
 function tripChartsTemplate(trip) {
-  const stats = tripStats(trip);
   const categorySummary = tripUtils.summarizeExpensesByCategory(trip);
   return `
     <section class="trip-charts-grid" aria-label="Graficos financeiros da viagem">
-      <article class="chart-card chart-card-wide">
+      <article class="chart-card">
         <div class="chart-card-header">
           <div><p class="eyebrow">Categorias</p><h3>Gastos por categoria</h3></div>
           <span>${categorySummary.length} categoria(s)</span>
@@ -508,19 +508,8 @@ function tripChartsTemplate(trip) {
         ${tripCategoryChartTemplate(trip, categorySummary)}
       </article>
       <article class="chart-card">
-        <div class="chart-card-header"><div><p class="eyebrow">Ritmo</p><h3>Gastos por dia</h3></div></div>
-        <div class="chart-shell"><canvas id="tripDailyChart" role="img" aria-label="Grafico de gastos por dia"></canvas></div>
-      </article>
-      <article class="chart-card">
         <div class="chart-card-header"><div><p class="eyebrow">Acumulado</p><h3>Evolucao dos gastos</h3></div></div>
         <div class="chart-shell"><canvas id="tripCumulativeChart" role="img" aria-label="Grafico de gastos acumulados"></canvas></div>
-      </article>
-      <article class="chart-card chart-card-wide">
-        <div class="chart-card-header">
-          <div><p class="eyebrow">Orcamento</p><h3>Total versus gasto</h3></div>
-          <span>${escapeHtml(stats.budgetState.label)}</span>
-        </div>
-        ${budgetComparisonTemplate(trip, stats)}
       </article>
     </section>
   `;
@@ -1008,6 +997,7 @@ async function saveTripFromForm(event) {
 
   await apiRequest("/api/trips", { method: "POST", body: payload });
   activeTripId = id;
+  activeTab = "overview";
   localStorage.setItem(STORAGE_KEYS.selectedTrip, activeTripId);
   await refreshTrips();
   elements.tripDialog.close();
