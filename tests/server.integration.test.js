@@ -232,10 +232,81 @@ test("salva e edita o vinculo entre compra do cartao e viagem", async () => {
   await request(`/api/card-statements/${statement.id}`, { method: "DELETE" });
 });
 
+test("registra medidas, musculacao e cardio no painel de academia", async () => {
+  await request("/api/fitness/measurements", {
+    method: "POST",
+    body: { measuredOn: "2026-08-03", weight: 82.4, bodyFat: 18.2, notes: "Inicio do ciclo" },
+  });
+  const workout = await request("/api/fitness/sessions", {
+    method: "POST",
+    body: {
+      id: "workout-test",
+      performedOn: "2026-08-03",
+      title: "Peito e biceps",
+      durationMinutes: 62,
+      energyLevel: 4,
+      performanceRating: 4,
+      notes: "Boa execucao",
+      exercises: [
+        {
+          id: "exercise-bench-test",
+          name: "Supino reto",
+          muscleGroup: "Peitoral",
+          sets: [
+            { id: "set-bench-1", weight: 80, reps: 10, rir: 2 },
+            { id: "set-bench-2", weight: 80, reps: 8, rir: 1 },
+          ],
+        },
+        {
+          id: "exercise-curl-test",
+          name: "Rosca direta",
+          muscleGroup: "Biceps",
+          sets: [
+            { id: "set-curl-1", weight: 30, reps: 12, rir: 2 },
+            { id: "set-curl-2", weight: 30, reps: 10, rir: 1 },
+          ],
+        },
+      ],
+    },
+  });
+  assert.match(workout.session.coachNote, /4 series/);
+  assert.equal(workout.awardXp, 104);
+
+  await request("/api/fitness/cardio", {
+    method: "POST",
+    body: {
+      id: "cardio-test",
+      performedOn: "2026-08-04",
+      modality: "Esteira",
+      durationMinutes: 35,
+      distanceKm: 4.2,
+      intensity: "Moderado",
+      notes: "Ritmo confortavel",
+    },
+  });
+  await request("/api/fitness/templates", {
+    method: "POST",
+    body: {
+      id: "template-test",
+      name: "Peito rapido",
+      exercises: [{ name: "Supino reto", muscleGroup: "Peitoral", suggestedSets: 3 }],
+    },
+  });
+
+  const dashboard = await request("/api/fitness/dashboard?date=2026-08-05");
+  assert.equal(dashboard.measurements[0].weight, 82.4);
+  assert.equal(dashboard.weekly.sessions, 1);
+  assert.equal(dashboard.weekly.cardioMinutes, 35);
+  assert.equal(dashboard.weekly.volumes.find((item) => item.muscleGroup === "Peitoral").sets, 2);
+  assert.equal(dashboard.templates[0].exercises[0].suggestedSets, 3);
+  assert.ok(dashboard.gamification.xp > 0);
+});
+
 test("serve as telas com os utilitarios compartilhados", async () => {
   const patrimony = await fetch(`${baseUrl}/patrimonio.html`).then((response) => response.text());
   const trips = await fetch(`${baseUrl}/viagens.html`).then((response) => response.text());
   const card = await fetch(`${baseUrl}/cartao.html`).then((response) => response.text());
+  const fitness = await fetch(`${baseUrl}/academia.html`).then((response) => response.text());
 
   assert.match(patrimony, /investmentDetailContent/);
   assert.match(patrimony, /financial-utils\.js/);
@@ -243,6 +314,8 @@ test("serve as telas com os utilitarios compartilhados", async () => {
   assert.match(trips, /trip-utils\.js/);
   assert.match(card, /invoiceTrendChart/);
   assert.match(card, /card-utils\.js/);
+  assert.match(fitness, /weeklyVolumeGrid/);
+  assert.match(fitness, /fitness-utils\.js/);
 });
 
 async function request(pathname, options = {}) {
