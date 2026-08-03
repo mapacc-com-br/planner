@@ -34,6 +34,12 @@ Pagina de viagens:
 http://localhost:8080/viagens.html
 ```
 
+Pagina de academia:
+
+```text
+http://localhost:8080/academia.html
+```
+
 Para usar exatamente `http://localhost`, a porta 80 precisa estar livre:
 
 ```powershell
@@ -80,6 +86,20 @@ Tabelas principais:
 - `trip_itinerary_items`
 - `trip_checklist_items`
 - `trip_documents`
+- `fitness_profiles`
+- `fitness_measurements`
+- `fitness_volume_targets`
+- `fitness_workout_sessions`
+- `fitness_workout_exercises`
+- `fitness_workout_sets`
+- `fitness_cardio_sessions`
+- `fitness_templates`
+
+## Academia
+
+O modulo de academia compartilha o mesmo login e banco SQLite do Planner, mas separa os dados por perfil. Ele registra peso, body fat opcional, musculacao, cardio, modelos de treino e metas semanais editaveis.
+
+O painel calcula series por grupo muscular, tonelagem, sequencia semanal, XP, melhores marcas estimadas e sinais de evolucao. As faixas iniciais de volume sao apenas um ponto de partida configuravel e nao substituem avaliacao profissional.
 
 ## Meta patrimonial
 

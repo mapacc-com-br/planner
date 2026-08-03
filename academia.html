@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#183f32" />
+    <title>Planner de academia</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=fitness-3" />
+  </head>
+  <body class="fitness-app">
+    <div class="fitness-shell">
+      <aside class="fitness-sidebar" aria-label="Navegacao da academia">
+        <a class="fitness-side-mark" href="./index.html" title="Planner financeiro" aria-label="Planner financeiro">
+          <i data-lucide="calendar-check"></i>
+        </a>
+        <nav class="fitness-side-nav">
+          <a class="fitness-side-link is-active" href="#overview" title="Visao geral" aria-label="Visao geral">
+            <i data-lucide="layout-dashboard"></i>
+          </a>
+          <button class="fitness-side-link" type="button" data-open-workout title="Registrar treino" aria-label="Registrar treino">
+            <i data-lucide="dumbbell"></i>
+          </button>
+          <a class="fitness-side-link" href="#progress" title="Evolucao" aria-label="Evolucao">
+            <i data-lucide="trending-up"></i>
+          </a>
+          <a class="fitness-side-link" href="#history" title="Historico" aria-label="Historico">
+            <i data-lucide="history"></i>
+          </a>
+        </nav>
+        <a class="fitness-side-link fitness-side-exit" href="./index.html" title="Voltar ao financeiro" aria-label="Voltar ao financeiro">
+          <i data-lucide="arrow-left"></i>
+        </a>
+      </aside>
+
+      <nav class="fitness-mobile-nav" aria-label="Navegacao mobile">
+        <a class="fitness-mobile-link is-active" href="#overview">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Semana</span>
+        </a>
+        <button class="fitness-mobile-link" type="button" data-open-workout>
+          <i data-lucide="circle-plus"></i>
+          <span>Treino</span>
+        </button>
+        <a class="fitness-mobile-link" href="#history">
+          <i data-lucide="history"></i>
+          <span>Historico</span>
+        </a>
+        <a class="fitness-mobile-link" href="./index.html">
+          <i data-lucide="wallet-cards"></i>
+          <span>Financeiro</span>
+        </a>
+      </nav>
+
+      <main class="fitness-workspace" id="overview">
+        <header class="fitness-topbar">
+          <div class="fitness-brand">
+            <div class="fitness-brand-mark" aria-hidden="true">
+              <i data-lucide="dumbbell"></i>
+            </div>
+            <div>
+              <p class="fitness-eyebrow">Ritmo pessoal</p>
+              <h1>Planner de academia</h1>
+            </div>
+          </div>
+          <div class="fitness-top-actions">
+            <button class="fitness-button fitness-button-light" id="openMeasurement" type="button">
+              <i data-lucide="scale"></i>
+              Peso e body fat
+            </button>
+            <a class="fitness-button fitness-button-ink" href="./index.html">
+              <i data-lucide="wallet-cards"></i>
+              Financeiro
+            </a>
+            <button class="fitness-icon-button" id="fitnessLogout" type="button" title="Sair" aria-label="Sair">
+              <i data-lucide="log-out"></i>
+            </button>
+          </div>
+        </header>
+
+        <section class="fitness-hero" aria-labelledby="fitnessHeroTitle">
+          <div class="fitness-hero-copy">
+            <p class="fitness-kicker" id="fitnessWeekLabel">Sua semana em movimento</p>
+            <h2 id="fitnessHeroTitle">Consistencia vence pressa.</h2>
+            <p id="fitnessHeroSupport">Registre o que fez, entenda o volume e saia com o proximo passo claro.</p>
+            <div class="fitness-hero-actions">
+              <button class="fitness-button fitness-button-accent" type="button" data-open-workout>
+                <i data-lucide="dumbbell"></i>
+                Registrar treino
+              </button>
+              <button class="fitness-button fitness-button-ghost" id="repeatLastWorkout" type="button">
+                <i data-lucide="repeat-2"></i>
+                Repetir ultimo
+              </button>
+              <button class="fitness-button fitness-button-ghost" id="openCardio" type="button">
+                <i data-lucide="activity"></i>
+                Cardio
+              </button>
+            </div>
+          </div>
+
+          <div class="fitness-score-card">
+            <div class="fitness-score-ring" id="weekScoreRing" style="--score: 0%">
+              <div>
+                <strong id="weekScoreValue">0%</strong>
+                <span>da semana</span>
+              </div>
+            </div>
+            <div class="fitness-score-copy">
+              <span>Placar atual</span>
+              <strong id="weekScoreTitle">Comece com um registro</strong>
+              <small id="weekScoreHint">Treino e cardio somam para a sua meta.</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="fitness-kpi-grid" aria-label="Resumo da semana">
+          <article class="fitness-kpi">
+            <span class="fitness-kpi-icon"><i data-lucide="calendar-check-2"></i></span>
+            <div><strong id="weeklySessions">0 / 3</strong><span>treinos na semana</span></div>
+          </article>
+          <article class="fitness-kpi">
+            <span class="fitness-kpi-icon"><i data-lucide="timer"></i></span>
+            <div><strong id="weeklyCardio">0 min</strong><span>cardio acumulado</span></div>
+          </article>
+          <article class="fitness-kpi">
+            <span class="fitness-kpi-icon"><i data-lucide="flame"></i></span>
+            <div><strong id="fitnessStreak">0 semanas</strong><span>sequencia consistente</span></div>
+          </article>
+          <article class="fitness-kpi">
+            <span class="fitness-kpi-icon"><i data-lucide="trophy"></i></span>
+            <div><strong id="fitnessLevel">Nivel 1</strong><span id="fitnessLevelName">Comecando</span></div>
+          </article>
+        </section>
+
+        <div class="fitness-main-grid">
+          <section class="fitness-panel fitness-volume-panel" aria-labelledby="weeklyVolumeTitle">
+            <header class="fitness-panel-header">
+              <div>
+                <p class="fitness-eyebrow">Guia, nao cobranca</p>
+                <h2 id="weeklyVolumeTitle">Volume semanal</h2>
+                <p>Series concluidas por grupo muscular.</p>
+              </div>
+              <button class="fitness-button fitness-button-light" id="openTargets" type="button">
+                <i data-lucide="sliders-horizontal"></i>
+                Ajustar metas
+              </button>
+            </header>
+            <div class="fitness-volume-legend" aria-label="Legenda do volume">
+              <span><i class="legend-dot low"></i> Baixo</span>
+              <span><i class="legend-dot good"></i> Adequado</span>
+              <span><i class="legend-dot high"></i> Elevado</span>
+            </div>
+            <div class="fitness-volume-grid" id="weeklyVolumeGrid"></div>
+          </section>
+
+          <aside class="fitness-panel fitness-coach-panel" aria-labelledby="coachTitle">
+            <div class="fitness-coach-orbit" aria-hidden="true"><i data-lucide="sparkles"></i></div>
+            <p class="fitness-eyebrow">Copiloto de treino</p>
+            <h2 id="coachTitle">Leitura da sua rotina</h2>
+            <blockquote id="coachNote">Seu primeiro treino vai criar a linha de base para as proximas leituras.</blockquote>
+            <div class="fitness-coach-meta" id="coachMeta">
+              <span><i data-lucide="shield-check"></i> Baseado apenas no seu historico</span>
+            </div>
+          </aside>
+        </div>
+
+        <div class="fitness-progress-grid" id="progress">
+          <section class="fitness-panel fitness-body-panel" aria-labelledby="bodyTrendTitle">
+            <header class="fitness-panel-header">
+              <div>
+                <p class="fitness-eyebrow">Tendencia, nao um dia isolado</p>
+                <h2 id="bodyTrendTitle">Evolucao corporal</h2>
+              </div>
+              <button class="fitness-icon-button fitness-icon-button-border" id="openMeasurementSecondary" type="button" title="Novo check-in" aria-label="Novo check-in">
+                <i data-lucide="plus"></i>
+              </button>
+            </header>
+            <div class="fitness-body-summary">
+              <div><span>Peso atual</span><strong id="latestWeight">--</strong><small id="weightChange">Sem historico</small></div>
+              <div><span>Body fat</span><strong id="latestBodyFat">--</strong><small id="bodyFatChange">Opcional</small></div>
+              <div><span>Check-ins</span><strong id="measurementCount">0</strong><small>registros salvos</small></div>
+            </div>
+            <div class="fitness-chart" id="bodyTrendChart" aria-label="Grafico de evolucao do peso"></div>
+          </section>
+
+          <section class="fitness-panel fitness-template-panel" aria-labelledby="templatesTitle">
+            <header class="fitness-panel-header">
+              <div>
+                <p class="fitness-eyebrow">Menos toques</p>
+                <h2 id="templatesTitle">Comecar rapido</h2>
+              </div>
+            </header>
+            <div class="fitness-template-list" id="templateList"></div>
+          </section>
+        </div>
+
+        <div class="fitness-history-grid" id="history">
+          <section class="fitness-panel" aria-labelledby="historyTitle">
+            <header class="fitness-panel-header">
+              <div>
+                <p class="fitness-eyebrow">O que realmente aconteceu</p>
+                <h2 id="historyTitle">Historico recente</h2>
+              </div>
+              <span class="fitness-count-pill" id="historyCount">0 registros</span>
+            </header>
+            <div class="fitness-timeline" id="fitnessTimeline"></div>
+          </section>
+
+          <aside class="fitness-panel fitness-progress-panel" aria-labelledby="progressTitle">
+            <header class="fitness-panel-header">
+              <div>
+                <p class="fitness-eyebrow">Carga e repeticoes</p>
+                <h2 id="progressTitle">Sinais de evolucao</h2>
+              </div>
+            </header>
+            <div class="fitness-progress-list" id="muscleProgressList"></div>
+            <div class="fitness-records" id="personalRecords"></div>
+          </aside>
+        </div>
+
+        <p class="fitness-guidance-note">
+          <i data-lucide="info"></i>
+          As faixas sao editaveis e servem como referencia de organizacao. Dor, lesao, fadiga persistente ou mudancas bruscas pedem avaliacao profissional.
+        </p>
+      </main>
+    </div>
+
+    <dialog class="fitness-dialog fitness-workout-dialog" id="workoutDialog">
+      <form class="fitness-dialog-body" id="workoutForm">
+        <header class="fitness-dialog-header">
+          <div>
+            <p class="fitness-eyebrow">Registro guiado</p>
+            <h2 id="workoutDialogTitle">Treino de hoje</h2>
+          </div>
+          <button class="fitness-icon-button fitness-icon-button-border" type="button" data-close-dialog="workoutDialog" aria-label="Fechar">
+            <i data-lucide="x"></i>
+          </button>
+        </header>
+
+        <div class="fitness-form-grid fitness-form-grid-four">
+          <label class="fitness-field fitness-field-wide-mobile">
+            <span>Nome do treino</span>
+            <input name="title" placeholder="Ex.: Peito e biceps" required maxlength="120" />
+          </label>
+          <label class="fitness-field">
+            <span>Data</span>
+            <input name="performedOn" type="date" required />
+          </label>
+          <label class="fitness-field">
+            <span>Duracao (min)</span>
+            <input name="durationMinutes" type="number" min="0" max="600" value="60" inputmode="numeric" />
+          </label>
+          <label class="fitness-field">
+            <span>Energia</span>
+            <select name="energyLevel">
+              <option value="1">1 - Muito baixa</option>
+              <option value="2">2 - Baixa</option>
+              <option value="3" selected>3 - Normal</option>
+              <option value="4">4 - Boa</option>
+              <option value="5">5 - Excelente</option>
+            </select>
+          </label>
+          <label class="fitness-field">
+            <span>Como rendeu?</span>
+            <select name="performanceRating">
+              <option value="1">1 - Muito abaixo</option>
+              <option value="2">2 - Abaixo</option>
+              <option value="3" selected>3 - Normal</option>
+              <option value="4">4 - Bom</option>
+              <option value="5">5 - Excelente</option>
+            </select>
+          </label>
+        </div>
+
+        <section class="fitness-exercise-section">
+          <div class="fitness-section-heading">
+            <div><span>Exercicios</span><small>Carga, repeticoes e RIR. O resto fica por nossa conta.</small></div>
+            <button class="fitness-button fitness-button-light" id="addExercise" type="button">
+              <i data-lucide="plus"></i>
+              Exercicio
+            </button>
+          </div>
+          <div class="fitness-exercise-builder" id="exerciseBuilder"></div>
+        </section>
+
+        <label class="fitness-field">
+          <span>Notas do dia</span>
+          <textarea name="notes" rows="3" placeholder="Execucao, dores, sono, sensacoes ou algo que queira lembrar..."></textarea>
+        </label>
+
+        <label class="fitness-check-row">
+          <input id="saveAsTemplate" type="checkbox" />
+          <span>Salvar esta estrutura para repetir em um toque</span>
+        </label>
+        <label class="fitness-field" id="templateNameField" hidden>
+          <span>Nome do modelo</span>
+          <input id="templateName" maxlength="100" placeholder="Ex.: Peito A" />
+        </label>
+
+        <footer class="fitness-dialog-actions">
+          <button class="fitness-button fitness-button-light" type="button" data-close-dialog="workoutDialog">Cancelar</button>
+          <button class="fitness-button fitness-button-accent" type="submit">
+            <i data-lucide="check-circle-2"></i>
+            Finalizar treino
+          </button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="fitness-dialog" id="measurementDialog">
+      <form class="fitness-dialog-body" id="measurementForm">
+        <header class="fitness-dialog-header">
+          <div><p class="fitness-eyebrow">Check-in rapido</p><h2>Peso e body fat</h2></div>
+          <button class="fitness-icon-button fitness-icon-button-border" type="button" data-close-dialog="measurementDialog" aria-label="Fechar"><i data-lucide="x"></i></button>
+        </header>
+        <p class="fitness-form-intro">Use condicoes parecidas de horario e hidratacao. O grafico valoriza a tendencia, nao uma medida isolada.</p>
+        <div class="fitness-form-grid">
+          <label class="fitness-field"><span>Data</span><input name="measuredOn" type="date" required /></label>
+          <label class="fitness-field"><span>Peso atual (kg)</span><input name="weight" type="number" min="20" max="500" step="0.1" inputmode="decimal" required placeholder="82,4" /></label>
+          <label class="fitness-field"><span>Body fat (%)</span><input name="bodyFat" type="number" min="1" max="75" step="0.1" inputmode="decimal" placeholder="Opcional" /></label>
+          <label class="fitness-field fitness-field-wide"><span>Nota</span><input name="notes" maxlength="1000" placeholder="Ex.: em jejum, mesma balanca" /></label>
+        </div>
+        <footer class="fitness-dialog-actions">
+          <button class="fitness-button fitness-button-light" type="button" data-close-dialog="measurementDialog">Cancelar</button>
+          <button class="fitness-button fitness-button-accent" type="submit"><i data-lucide="save"></i>Salvar check-in</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="fitness-dialog" id="cardioDialog">
+      <form class="fitness-dialog-body" id="cardioForm">
+        <header class="fitness-dialog-header">
+          <div><p class="fitness-eyebrow">Condicionamento</p><h2>Registrar cardio</h2></div>
+          <button class="fitness-icon-button fitness-icon-button-border" type="button" data-close-dialog="cardioDialog" aria-label="Fechar"><i data-lucide="x"></i></button>
+        </header>
+        <div class="fitness-form-grid">
+          <label class="fitness-field"><span>Data</span><input name="performedOn" type="date" required /></label>
+          <label class="fitness-field"><span>Modalidade</span><input name="modality" list="cardioSuggestions" required placeholder="Ex.: Esteira" /></label>
+          <label class="fitness-field"><span>Duracao (min)</span><input name="durationMinutes" type="number" min="1" max="600" inputmode="numeric" required /></label>
+          <label class="fitness-field"><span>Distancia (km)</span><input name="distanceKm" type="number" min="0" max="1000" step="0.1" inputmode="decimal" placeholder="Opcional" /></label>
+          <label class="fitness-field"><span>Intensidade</span><select name="intensity"><option>Leve</option><option selected>Moderado</option><option>Intenso</option></select></label>
+          <label class="fitness-field fitness-field-wide"><span>Nota</span><input name="notes" maxlength="2000" placeholder="Ritmo, inclinacao ou sensacao" /></label>
+        </div>
+        <footer class="fitness-dialog-actions">
+          <button class="fitness-button fitness-button-light" type="button" data-close-dialog="cardioDialog">Cancelar</button>
+          <button class="fitness-button fitness-button-accent" type="submit"><i data-lucide="check"></i>Salvar cardio</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="fitness-dialog fitness-target-dialog" id="targetsDialog">
+      <form class="fitness-dialog-body" id="targetsForm">
+        <header class="fitness-dialog-header">
+          <div><p class="fitness-eyebrow">Seu ponto de referencia</p><h2>Metas semanais</h2></div>
+          <button class="fitness-icon-button fitness-icon-button-border" type="button" data-close-dialog="targetsDialog" aria-label="Fechar"><i data-lucide="x"></i></button>
+        </header>
+        <p class="fitness-form-intro">As faixas iniciais sao apenas um ponto de partida editavel. Ajuste com base na sua rotina e orientacao profissional.</p>
+        <div class="fitness-form-grid">
+          <label class="fitness-field"><span>Treinos por semana</span><input id="weeklySessionGoal" type="number" min="1" max="14" required /></label>
+          <label class="fitness-field"><span>Cardio por semana (min)</span><input id="weeklyCardioGoal" type="number" min="0" max="1000" required /></label>
+        </div>
+        <div class="fitness-target-list" id="targetsList"></div>
+        <footer class="fitness-dialog-actions">
+          <button class="fitness-button fitness-button-light" type="button" data-close-dialog="targetsDialog">Cancelar</button>
+          <button class="fitness-button fitness-button-accent" type="submit"><i data-lucide="save"></i>Salvar metas</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="fitness-dialog" id="sessionDialog">
+      <div class="fitness-dialog-body">
+        <header class="fitness-dialog-header">
+          <div><p class="fitness-eyebrow">Treino salvo</p><h2 id="sessionDetailTitle">Detalhes</h2></div>
+          <button class="fitness-icon-button fitness-icon-button-border" type="button" data-close-dialog="sessionDialog" aria-label="Fechar"><i data-lucide="x"></i></button>
+        </header>
+        <div id="sessionDetailContent"></div>
+        <footer class="fitness-dialog-actions">
+          <button class="fitness-button fitness-button-light" id="deleteSession" type="button"><i data-lucide="trash-2"></i>Excluir</button>
+          <button class="fitness-button fitness-button-accent" id="repeatSession" type="button"><i data-lucide="repeat-2"></i>Repetir treino</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog class="fitness-dialog fitness-celebration-dialog" id="celebrationDialog">
+      <div class="fitness-dialog-body fitness-celebration-body">
+        <div class="fitness-celebration-mark"><i data-lucide="trophy"></i></div>
+        <p class="fitness-eyebrow">Registro concluido</p>
+        <h2 id="celebrationTitle">Treino salvo</h2>
+        <strong class="fitness-xp-award" id="celebrationXp">+0 XP</strong>
+        <p id="celebrationNote"></p>
+        <button class="fitness-button fitness-button-accent" type="button" data-close-dialog="celebrationDialog">Continuar a semana</button>
+      </div>
+    </dialog>
+
+    <datalist id="exerciseSuggestions">
+      <option value="Supino reto"></option><option value="Supino inclinado"></option><option value="Crucifixo"></option>
+      <option value="Puxada frontal"></option><option value="Remada baixa"></option><option value="Remada curvada"></option>
+      <option value="Agachamento"></option><option value="Leg press"></option><option value="Cadeira extensora"></option>
+      <option value="Mesa flexora"></option><option value="Stiff"></option><option value="Elevacao pelvica"></option>
+      <option value="Desenvolvimento"></option><option value="Elevacao lateral"></option><option value="Rosca direta"></option>
+      <option value="Rosca martelo"></option><option value="Triceps corda"></option><option value="Triceps testa"></option>
+      <option value="Panturrilha em pe"></option><option value="Prancha"></option>
+    </datalist>
+    <datalist id="cardioSuggestions">
+      <option value="Esteira"></option><option value="Bicicleta"></option><option value="Eliptico"></option>
+      <option value="Escada"></option><option value="Corrida ao ar livre"></option><option value="Caminhada"></option>
+    </datalist>
+
+    <div class="fitness-toast" id="fitnessToast" role="status" aria-live="polite"></div>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./fitness-utils.js?v=fitness-2"></script>
+    <script src="./academia.js?v=fitness-2"></script>
+  </body>
+</html>

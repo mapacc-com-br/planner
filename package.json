@@ -5,7 +5,7 @@
   "description": "Planner financeiro familiar com SQLite local.",
   "scripts": {
     "start": "node server.js 8080",
-    "check": "node --check server.js && node --check app.js && node --check patrimonio.js && node --check viagens.js && node --check cartao.js && node --check financial-utils.js && node --check investment-view.js && node --check trip-utils.js && node --check card-utils.js && node --check chart-utils.js",
+    "check": "node --check server.js && node --check app.js && node --check patrimonio.js && node --check viagens.js && node --check cartao.js && node --check academia.js && node --check fitness-utils.js && node --check financial-utils.js && node --check investment-view.js && node --check trip-utils.js && node --check card-utils.js && node --check chart-utils.js",
     "test": "node --test tests/*.test.js"
   },
   "engines": {

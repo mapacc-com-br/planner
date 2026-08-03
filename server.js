@@ -3,6 +3,7 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const { DatabaseSync } = require("node:sqlite");
+const FitnessUtils = require("./fitness-utils");
 
 const root = __dirname;
 const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR || path.join(root, "data");
@@ -99,6 +100,8 @@ async function handleApi(request, response, url) {
       cardTransactions: db.prepare("select count(*) as count from card_transactions").get().count,
       trips: db.prepare("select count(*) as count from trips").get().count,
       tripExpenses: db.prepare("select count(*) as count from trip_expenses").get().count,
+      fitnessSessions: db.prepare("select count(*) as count from fitness_workout_sessions").get().count,
+      fitnessCardio: db.prepare("select count(*) as count from fitness_cardio_sessions").get().count,
     });
     return;
   }
@@ -353,6 +356,96 @@ async function handleApi(request, response, url) {
 
   if (method === "DELETE" && parts[1] === "trip-documents" && parts[2]) {
     db.prepare("delete from trip_documents where id = ?").run(pathParam(parts[2]));
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (method === "GET" && url.pathname === "/api/fitness/dashboard") {
+    const profileId = getFitnessProfileId(request, url.searchParams.get("profile"));
+    sendJson(response, 200, getFitnessDashboard(profileId, url.searchParams.get("date")));
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/api/fitness/measurements") {
+    const body = await readJson(request);
+    const profileId = getFitnessProfileId(request, body.profileId);
+    const measurement = normalizeFitnessMeasurement(body, profileId);
+    saveFitnessMeasurement(measurement);
+    sendJson(response, 200, { measurement, dashboard: getFitnessDashboard(profileId, measurement.measuredOn) });
+    return;
+  }
+
+  if (method === "DELETE" && parts[1] === "fitness" && parts[2] === "measurements" && parts[3]) {
+    const profileId = getFitnessProfileId(request);
+    db.prepare("delete from fitness_measurements where id = ? and profile_id = ?").run(pathParam(parts[3]), profileId);
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/api/fitness/sessions") {
+    const body = await readJson(request);
+    const profileId = getFitnessProfileId(request, body.profileId);
+    const session = normalizeFitnessSession(body, profileId);
+    const saved = saveFitnessSession(session);
+    sendJson(response, 200, {
+      session: saved,
+      awardXp: 80 + FitnessUtils.summarizeSession(saved).sets * 6,
+      dashboard: getFitnessDashboard(profileId, saved.performedOn),
+    });
+    return;
+  }
+
+  if (method === "DELETE" && parts[1] === "fitness" && parts[2] === "sessions" && parts[3]) {
+    const profileId = getFitnessProfileId(request);
+    db.prepare("delete from fitness_workout_sessions where id = ? and profile_id = ?").run(pathParam(parts[3]), profileId);
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/api/fitness/cardio") {
+    const body = await readJson(request);
+    const profileId = getFitnessProfileId(request, body.profileId);
+    const cardio = normalizeFitnessCardio(body, profileId);
+    saveFitnessCardio(cardio);
+    sendJson(response, 200, {
+      cardio,
+      awardXp: Math.min(cardio.durationMinutes, 90) * 2,
+      dashboard: getFitnessDashboard(profileId, cardio.performedOn),
+    });
+    return;
+  }
+
+  if (method === "DELETE" && parts[1] === "fitness" && parts[2] === "cardio" && parts[3]) {
+    const profileId = getFitnessProfileId(request);
+    db.prepare("delete from fitness_cardio_sessions where id = ? and profile_id = ?").run(pathParam(parts[3]), profileId);
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/api/fitness/targets") {
+    const body = await readJson(request);
+    const profileId = getFitnessProfileId(request, body.profileId);
+    const targets = normalizeFitnessTargets(body.targets);
+    saveFitnessTargets(profileId, targets);
+    if (body.weeklySessionGoal !== undefined || body.weeklyCardioGoalMinutes !== undefined) {
+      updateFitnessProfileGoals(profileId, body.weeklySessionGoal, body.weeklyCardioGoalMinutes);
+    }
+    sendJson(response, 200, { dashboard: getFitnessDashboard(profileId, body.referenceDate) });
+    return;
+  }
+
+  if (method === "POST" && url.pathname === "/api/fitness/templates") {
+    const body = await readJson(request);
+    const profileId = getFitnessProfileId(request, body.profileId);
+    const template = normalizeFitnessTemplate(body, profileId);
+    saveFitnessTemplate(template);
+    sendJson(response, 200, { template: getFitnessTemplate(template.id, profileId) });
+    return;
+  }
+
+  if (method === "DELETE" && parts[1] === "fitness" && parts[2] === "templates" && parts[3]) {
+    const profileId = getFitnessProfileId(request);
+    db.prepare("delete from fitness_templates where id = ? and profile_id = ?").run(pathParam(parts[3]), profileId);
     sendJson(response, 200, { ok: true });
     return;
   }
@@ -770,6 +863,101 @@ function initializeDatabase() {
       updated_at text not null default (datetime('now'))
     );
 
+    create table if not exists fitness_profiles (
+      id text primary key references users(id) on delete cascade,
+      display_name text not null check (length(trim(display_name)) > 0),
+      weekly_session_goal integer not null default 3 check (weekly_session_goal between 1 and 14),
+      weekly_cardio_goal_minutes integer not null default 90 check (weekly_cardio_goal_minutes between 0 and 1000),
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now'))
+    );
+
+    create table if not exists fitness_measurements (
+      id text primary key,
+      profile_id text not null references fitness_profiles(id) on delete cascade,
+      measured_on text not null check (measured_on glob '????-??-??'),
+      weight_kg real not null check (weight_kg between 20 and 500),
+      body_fat_pct real check (body_fat_pct is null or body_fat_pct between 1 and 75),
+      notes text not null default '',
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now')),
+      unique (profile_id, measured_on)
+    );
+
+    create table if not exists fitness_volume_targets (
+      profile_id text not null references fitness_profiles(id) on delete cascade,
+      muscle_group text not null,
+      color text not null,
+      min_sets integer not null check (min_sets between 0 and 50),
+      target_sets integer not null check (target_sets between min_sets and 50),
+      max_sets integer not null check (max_sets between target_sets and 60),
+      updated_at text not null default (datetime('now')),
+      primary key (profile_id, muscle_group)
+    );
+
+    create table if not exists fitness_workout_sessions (
+      id text primary key,
+      profile_id text not null references fitness_profiles(id) on delete cascade,
+      performed_on text not null check (performed_on glob '????-??-??'),
+      title text not null check (length(trim(title)) > 0),
+      duration_minutes integer not null default 0 check (duration_minutes between 0 and 600),
+      energy_level integer not null default 3 check (energy_level between 1 and 5),
+      performance_rating integer not null default 3 check (performance_rating between 1 and 5),
+      notes text not null default '',
+      coach_note text not null default '',
+      completed_at text not null default (datetime('now')),
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now'))
+    );
+
+    create table if not exists fitness_workout_exercises (
+      id text primary key,
+      session_id text not null references fitness_workout_sessions(id) on delete cascade,
+      name text not null check (length(trim(name)) > 0),
+      muscle_group text not null,
+      sort_order integer not null default 0
+    );
+
+    create table if not exists fitness_workout_sets (
+      id text primary key,
+      exercise_id text not null references fitness_workout_exercises(id) on delete cascade,
+      set_number integer not null check (set_number between 1 and 50),
+      weight_kg real not null default 0 check (weight_kg between 0 and 1000),
+      reps integer not null check (reps between 1 and 500),
+      rir real check (rir is null or rir between 0 and 10),
+      completed integer not null default 1 check (completed in (0, 1))
+    );
+
+    create table if not exists fitness_cardio_sessions (
+      id text primary key,
+      profile_id text not null references fitness_profiles(id) on delete cascade,
+      performed_on text not null check (performed_on glob '????-??-??'),
+      modality text not null check (length(trim(modality)) > 0),
+      duration_minutes integer not null check (duration_minutes between 1 and 600),
+      distance_km real check (distance_km is null or distance_km between 0 and 1000),
+      intensity text not null check (intensity in ('Leve', 'Moderado', 'Intenso')),
+      notes text not null default '',
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now'))
+    );
+
+    create table if not exists fitness_templates (
+      id text primary key,
+      profile_id text not null references fitness_profiles(id) on delete cascade,
+      name text not null check (length(trim(name)) > 0),
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now'))
+    );
+
+    create table if not exists fitness_template_exercises (
+      id text primary key,
+      template_id text not null references fitness_templates(id) on delete cascade,
+      name text not null check (length(trim(name)) > 0),
+      muscle_group text not null,
+      suggested_sets integer not null default 3 check (suggested_sets between 1 and 20),
+      sort_order integer not null default 0
+    );
+
     create index if not exists idx_trips_dates on trips(start_date, end_date);
     create index if not exists idx_trip_travelers_trip on trip_travelers(trip_id);
     create index if not exists idx_trip_categories_trip on trip_categories(trip_id);
@@ -781,6 +969,12 @@ function initializeDatabase() {
     create index if not exists idx_trip_itinerary_trip on trip_itinerary_items(trip_id, date);
     create index if not exists idx_trip_checklist_trip on trip_checklist_items(trip_id);
     create index if not exists idx_trip_documents_trip on trip_documents(trip_id);
+    create index if not exists idx_fitness_measurements_profile_date on fitness_measurements(profile_id, measured_on desc);
+    create index if not exists idx_fitness_sessions_profile_date on fitness_workout_sessions(profile_id, performed_on desc);
+    create index if not exists idx_fitness_exercises_session on fitness_workout_exercises(session_id, sort_order);
+    create index if not exists idx_fitness_sets_exercise on fitness_workout_sets(exercise_id, set_number);
+    create index if not exists idx_fitness_cardio_profile_date on fitness_cardio_sessions(profile_id, performed_on desc);
+    create index if not exists idx_fitness_templates_profile on fitness_templates(profile_id, updated_at desc);
 
     create trigger if not exists bills_updated_at
     after update on bills
@@ -912,6 +1106,8 @@ function initializeDatabase() {
     db.prepare("insert or ignore into workspaces (id, name) values (?, ?)").run("home", "Casa");
     db.prepare("insert or ignore into workspace_users (workspace_id, user_id, role) values (?, ?, ?)").run("home", "andre", "owner");
     db.prepare("insert or ignore into workspace_users (workspace_id, user_id, role) values (?, ?, ?)").run("home", "luciana", "owner");
+    db.prepare("insert or ignore into fitness_profiles (id, display_name) values (?, ?)").run("andre", "Andre");
+    db.prepare("insert or ignore into fitness_profiles (id, display_name) values (?, ?)").run("luciana", "Luciana");
     db.prepare(
       `insert or ignore into financial_goals (
         id, workspace_id, name, current_amount_cents, target_amount_cents, target_date, monthly_contribution_cents
@@ -924,6 +1120,17 @@ function initializeDatabase() {
       on conflict(name) do update set color = excluded.color
     `);
     getDefaultCategories().forEach((category) => categoryStmt.run(category.name, category.color));
+
+    const targetStmt = db.prepare(`
+      insert or ignore into fitness_volume_targets (
+        profile_id, muscle_group, color, min_sets, target_sets, max_sets
+      ) values (?, ?, ?, ?, ?, ?)
+    `);
+    ["andre", "luciana"].forEach((profileId) => {
+      FitnessUtils.MUSCLE_GROUPS.forEach((target) => {
+        targetStmt.run(profileId, target.name, target.color, target.minSets, target.targetSets, target.maxSets);
+      });
+    });
   });
 
   db.prepare(
@@ -1028,6 +1235,507 @@ function getTripsState() {
   return {
     trips: getTrips(),
   };
+}
+
+function getFitnessDashboard(profileId, referenceDate) {
+  const profile = db
+    .prepare(
+      `select id, display_name, weekly_session_goal, weekly_cardio_goal_minutes
+         from fitness_profiles
+        where id = ?`,
+    )
+    .get(profileId);
+  if (!profile) throw new Error("Perfil de academia nao encontrado.");
+
+  const safeReferenceDate = referenceDate || FitnessUtils.dateKey(new Date());
+  assertDate(safeReferenceDate, "data de referencia");
+  const sessions = getFitnessSessions(profileId);
+  const cardio = getFitnessCardio(profileId);
+  const measurements = getFitnessMeasurements(profileId);
+  const targets = getFitnessTargets(profileId);
+  const weekly = FitnessUtils.buildWeeklySummary({ sessions, cardio, targets, referenceDate: safeReferenceDate });
+  const gamification = FitnessUtils.calculateGamification({
+    sessions,
+    cardio,
+    measurements,
+    weeklyGoal: profile.weekly_session_goal,
+    referenceDate: safeReferenceDate,
+  });
+
+  return {
+    profile: {
+      id: profile.id,
+      displayName: profile.display_name,
+      weeklySessionGoal: profile.weekly_session_goal,
+      weeklyCardioGoalMinutes: profile.weekly_cardio_goal_minutes,
+    },
+    referenceDate: safeReferenceDate,
+    measurements,
+    sessions,
+    cardio,
+    targets,
+    templates: getFitnessTemplates(profileId),
+    weekly,
+    gamification,
+    progress: FitnessUtils.buildMuscleProgress(sessions),
+    personalRecords: FitnessUtils.buildPersonalRecords(sessions).slice(0, 20),
+    latestCoachNote: sessions.find((session) => session.coachNote)?.coachNote || "",
+  };
+}
+
+function getFitnessProfileId(request, requestedProfileId) {
+  const currentUser = getCurrentUser(request);
+  const candidate = currentUser?.username || requestedProfileId || "andre";
+  const profileId = String(candidate).trim().toLowerCase();
+  const exists = db.prepare("select 1 from fitness_profiles where id = ?").get(profileId);
+  if (!exists) throw new Error("Perfil de academia invalido.");
+  return profileId;
+}
+
+function getFitnessMeasurements(profileId) {
+  return db
+    .prepare(
+      `select id, profile_id, measured_on, weight_kg, body_fat_pct, notes
+         from fitness_measurements
+        where profile_id = ?
+        order by measured_on desc, created_at desc`,
+    )
+    .all(profileId)
+    .map((row) => ({
+      id: row.id,
+      profileId: row.profile_id,
+      measuredOn: row.measured_on,
+      weight: Number(row.weight_kg),
+      bodyFat: row.body_fat_pct === null ? null : Number(row.body_fat_pct),
+      notes: row.notes,
+    }));
+}
+
+function getFitnessTargets(profileId) {
+  return db
+    .prepare(
+      `select muscle_group, color, min_sets, target_sets, max_sets
+         from fitness_volume_targets
+        where profile_id = ?
+        order by rowid asc`,
+    )
+    .all(profileId)
+    .map((row) => ({
+      muscleGroup: row.muscle_group,
+      color: row.color,
+      minSets: row.min_sets,
+      targetSets: row.target_sets,
+      maxSets: row.max_sets,
+    }));
+}
+
+function getFitnessSessions(profileId) {
+  const sessions = db
+    .prepare(
+      `select id, profile_id, performed_on, title, duration_minutes, energy_level,
+              performance_rating, notes, coach_note, completed_at
+         from fitness_workout_sessions
+        where profile_id = ?
+        order by performed_on desc, completed_at desc`,
+    )
+    .all(profileId)
+    .map((row) => ({
+      id: row.id,
+      profileId: row.profile_id,
+      performedOn: row.performed_on,
+      title: row.title,
+      durationMinutes: row.duration_minutes,
+      energyLevel: row.energy_level,
+      performanceRating: row.performance_rating,
+      notes: row.notes,
+      coachNote: row.coach_note,
+      completedAt: row.completed_at,
+      exercises: [],
+    }));
+  if (!sessions.length) return [];
+
+  const exercises = db
+    .prepare(
+      `select exercise.id, exercise.session_id, exercise.name, exercise.muscle_group, exercise.sort_order
+         from fitness_workout_exercises exercise
+         join fitness_workout_sessions session on session.id = exercise.session_id
+        where session.profile_id = ?
+        order by session.performed_on desc, exercise.sort_order asc`,
+    )
+    .all(profileId)
+    .map((row) => ({
+      id: row.id,
+      sessionId: row.session_id,
+      name: row.name,
+      muscleGroup: row.muscle_group,
+      sortOrder: row.sort_order,
+      sets: [],
+    }));
+  const sets = db
+    .prepare(
+      `select workout_set.id, workout_set.exercise_id, workout_set.set_number, workout_set.weight_kg,
+              workout_set.reps, workout_set.rir, workout_set.completed
+         from fitness_workout_sets workout_set
+         join fitness_workout_exercises exercise on exercise.id = workout_set.exercise_id
+         join fitness_workout_sessions session on session.id = exercise.session_id
+        where session.profile_id = ?
+        order by workout_set.set_number asc`,
+    )
+    .all(profileId)
+    .map((row) => ({
+      id: row.id,
+      exerciseId: row.exercise_id,
+      setNumber: row.set_number,
+      weight: Number(row.weight_kg),
+      reps: row.reps,
+      rir: row.rir === null ? null : Number(row.rir),
+      completed: Boolean(row.completed),
+    }));
+
+  const setsByExercise = new Map();
+  sets.forEach((set) => {
+    if (!setsByExercise.has(set.exerciseId)) setsByExercise.set(set.exerciseId, []);
+    setsByExercise.get(set.exerciseId).push(set);
+  });
+  const exercisesBySession = new Map();
+  exercises.forEach((exercise) => {
+    exercise.sets = setsByExercise.get(exercise.id) || [];
+    if (!exercisesBySession.has(exercise.sessionId)) exercisesBySession.set(exercise.sessionId, []);
+    exercisesBySession.get(exercise.sessionId).push(exercise);
+  });
+  sessions.forEach((session) => {
+    session.exercises = exercisesBySession.get(session.id) || [];
+  });
+  return sessions;
+}
+
+function getFitnessCardio(profileId) {
+  return db
+    .prepare(
+      `select id, profile_id, performed_on, modality, duration_minutes, distance_km, intensity, notes
+         from fitness_cardio_sessions
+        where profile_id = ?
+        order by performed_on desc, created_at desc`,
+    )
+    .all(profileId)
+    .map((row) => ({
+      id: row.id,
+      profileId: row.profile_id,
+      performedOn: row.performed_on,
+      modality: row.modality,
+      durationMinutes: row.duration_minutes,
+      distanceKm: row.distance_km === null ? null : Number(row.distance_km),
+      intensity: row.intensity,
+      notes: row.notes,
+    }));
+}
+
+function getFitnessTemplates(profileId) {
+  const templates = db
+    .prepare("select id, profile_id, name from fitness_templates where profile_id = ? order by updated_at desc, name asc")
+    .all(profileId)
+    .map((row) => ({ id: row.id, profileId: row.profile_id, name: row.name, exercises: [] }));
+  if (!templates.length) return [];
+  const exercises = db
+    .prepare(
+      `select exercise.id, exercise.template_id, exercise.name, exercise.muscle_group,
+              exercise.suggested_sets, exercise.sort_order
+         from fitness_template_exercises exercise
+         join fitness_templates template on template.id = exercise.template_id
+        where template.profile_id = ?
+        order by exercise.sort_order asc`,
+    )
+    .all(profileId);
+  exercises.forEach((row) => {
+    const template = templates.find((item) => item.id === row.template_id);
+    if (!template) return;
+    template.exercises.push({
+      id: row.id,
+      name: row.name,
+      muscleGroup: row.muscle_group,
+      suggestedSets: row.suggested_sets,
+      sortOrder: row.sort_order,
+    });
+  });
+  return templates;
+}
+
+function getFitnessTemplate(id, profileId) {
+  return getFitnessTemplates(profileId).find((template) => template.id === id) || null;
+}
+
+function saveFitnessMeasurement(measurement) {
+  db.prepare(
+    `insert into fitness_measurements (
+       id, profile_id, measured_on, weight_kg, body_fat_pct, notes
+     ) values (?, ?, ?, ?, ?, ?)
+     on conflict(profile_id, measured_on) do update set
+       weight_kg = excluded.weight_kg,
+       body_fat_pct = excluded.body_fat_pct,
+       notes = excluded.notes,
+       updated_at = datetime('now')`,
+  ).run(
+    measurement.id,
+    measurement.profileId,
+    measurement.measuredOn,
+    measurement.weight,
+    measurement.bodyFat,
+    measurement.notes,
+  );
+}
+
+function saveFitnessSession(session) {
+  transaction(() => {
+    db.prepare(
+      `insert into fitness_workout_sessions (
+         id, profile_id, performed_on, title, duration_minutes, energy_level,
+         performance_rating, notes, coach_note, completed_at
+       ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       on conflict(id) do update set
+         performed_on = excluded.performed_on,
+         title = excluded.title,
+         duration_minutes = excluded.duration_minutes,
+         energy_level = excluded.energy_level,
+         performance_rating = excluded.performance_rating,
+         notes = excluded.notes,
+         coach_note = excluded.coach_note,
+         completed_at = datetime('now'),
+         updated_at = datetime('now')`,
+    ).run(
+      session.id,
+      session.profileId,
+      session.performedOn,
+      session.title,
+      session.durationMinutes,
+      session.energyLevel,
+      session.performanceRating,
+      session.notes,
+      session.coachNote,
+    );
+    db.prepare("delete from fitness_workout_exercises where session_id = ?").run(session.id);
+
+    const exerciseStmt = db.prepare(
+      `insert into fitness_workout_exercises (id, session_id, name, muscle_group, sort_order)
+       values (?, ?, ?, ?, ?)`,
+    );
+    const setStmt = db.prepare(
+      `insert into fitness_workout_sets (id, exercise_id, set_number, weight_kg, reps, rir, completed)
+       values (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    session.exercises.forEach((exercise, exerciseIndex) => {
+      exerciseStmt.run(exercise.id, session.id, exercise.name, exercise.muscleGroup, exerciseIndex);
+      exercise.sets.forEach((set, setIndex) => {
+        setStmt.run(set.id, exercise.id, setIndex + 1, set.weight, set.reps, set.rir, set.completed ? 1 : 0);
+      });
+    });
+  });
+
+  const saved = getFitnessSessions(session.profileId).find((item) => item.id === session.id);
+  const weekly = FitnessUtils.buildWeeklySummary({
+    sessions: getFitnessSessions(session.profileId),
+    cardio: getFitnessCardio(session.profileId),
+    targets: getFitnessTargets(session.profileId),
+    referenceDate: session.performedOn,
+  });
+  const coachNote = FitnessUtils.buildCoachNote(saved, weekly);
+  db.prepare("update fitness_workout_sessions set coach_note = ?, updated_at = datetime('now') where id = ?").run(coachNote, session.id);
+  return { ...saved, coachNote };
+}
+
+function saveFitnessCardio(cardio) {
+  db.prepare(
+    `insert into fitness_cardio_sessions (
+       id, profile_id, performed_on, modality, duration_minutes, distance_km, intensity, notes
+     ) values (?, ?, ?, ?, ?, ?, ?, ?)
+     on conflict(id) do update set
+       performed_on = excluded.performed_on,
+       modality = excluded.modality,
+       duration_minutes = excluded.duration_minutes,
+       distance_km = excluded.distance_km,
+       intensity = excluded.intensity,
+       notes = excluded.notes,
+       updated_at = datetime('now')`,
+  ).run(
+    cardio.id,
+    cardio.profileId,
+    cardio.performedOn,
+    cardio.modality,
+    cardio.durationMinutes,
+    cardio.distanceKm,
+    cardio.intensity,
+    cardio.notes,
+  );
+}
+
+function saveFitnessTargets(profileId, targets) {
+  const statement = db.prepare(
+    `insert into fitness_volume_targets (
+       profile_id, muscle_group, color, min_sets, target_sets, max_sets
+     ) values (?, ?, ?, ?, ?, ?)
+     on conflict(profile_id, muscle_group) do update set
+       color = excluded.color,
+       min_sets = excluded.min_sets,
+       target_sets = excluded.target_sets,
+       max_sets = excluded.max_sets,
+       updated_at = datetime('now')`,
+  );
+  transaction(() => {
+    targets.forEach((target) => {
+      statement.run(profileId, target.muscleGroup, target.color, target.minSets, target.targetSets, target.maxSets);
+    });
+  });
+}
+
+function updateFitnessProfileGoals(profileId, weeklySessionGoal, weeklyCardioGoalMinutes) {
+  const current = db
+    .prepare("select weekly_session_goal, weekly_cardio_goal_minutes from fitness_profiles where id = ?")
+    .get(profileId);
+  const sessionGoal = weeklySessionGoal === undefined
+    ? current.weekly_session_goal
+    : integerInRange(weeklySessionGoal, 1, 14, "meta semanal de treinos");
+  const cardioGoal = weeklyCardioGoalMinutes === undefined
+    ? current.weekly_cardio_goal_minutes
+    : integerInRange(weeklyCardioGoalMinutes, 0, 1000, "meta semanal de cardio");
+  db.prepare(
+    `update fitness_profiles
+        set weekly_session_goal = ?, weekly_cardio_goal_minutes = ?, updated_at = datetime('now')
+      where id = ?`,
+  ).run(sessionGoal, cardioGoal, profileId);
+}
+
+function saveFitnessTemplate(template) {
+  transaction(() => {
+    db.prepare(
+      `insert into fitness_templates (id, profile_id, name)
+       values (?, ?, ?)
+       on conflict(id) do update set name = excluded.name, updated_at = datetime('now')`,
+    ).run(template.id, template.profileId, template.name);
+    db.prepare("delete from fitness_template_exercises where template_id = ?").run(template.id);
+    const statement = db.prepare(
+      `insert into fitness_template_exercises (
+         id, template_id, name, muscle_group, suggested_sets, sort_order
+       ) values (?, ?, ?, ?, ?, ?)`,
+    );
+    template.exercises.forEach((exercise, index) => {
+      statement.run(exercise.id, template.id, exercise.name, exercise.muscleGroup, exercise.suggestedSets, index);
+    });
+  });
+}
+
+function normalizeFitnessMeasurement(raw, profileId) {
+  const measuredOn = String(raw.measuredOn || FitnessUtils.dateKey(new Date()));
+  assertDate(measuredOn, "data da medida");
+  return {
+    id: `fitness-measurement-${profileId}-${measuredOn}`,
+    profileId,
+    measuredOn,
+    weight: numberInRange(raw.weight, 20, 500, "peso"),
+    bodyFat: optionalNumberInRange(raw.bodyFat, 1, 75, "body fat"),
+    notes: String(raw.notes || "").trim().slice(0, 1000),
+  };
+}
+
+function normalizeFitnessSession(raw, profileId) {
+  const performedOn = String(raw.performedOn || FitnessUtils.dateKey(new Date()));
+  assertDate(performedOn, "data do treino");
+  if (!Array.isArray(raw.exercises) || !raw.exercises.length) throw new Error("Inclua pelo menos um exercicio.");
+  if (raw.exercises.length > 30) throw new Error("O treino excedeu o limite de exercicios.");
+  return {
+    id: String(raw.id || crypto.randomUUID()),
+    profileId,
+    performedOn,
+    title: cleanText(raw.title, "nome do treino").slice(0, 120),
+    durationMinutes: integerInRange(raw.durationMinutes ?? 0, 0, 600, "duracao"),
+    energyLevel: integerInRange(raw.energyLevel ?? 3, 1, 5, "energia"),
+    performanceRating: integerInRange(raw.performanceRating ?? 3, 1, 5, "desempenho"),
+    notes: String(raw.notes || "").trim().slice(0, 4000),
+    coachNote: String(raw.coachNote || "").trim().slice(0, 4000),
+    exercises: raw.exercises.map((exercise, index) => normalizeFitnessExercise(exercise, index)),
+  };
+}
+
+function normalizeFitnessExercise(raw, index) {
+  const muscleGroup = cleanText(raw.muscleGroup, "grupo muscular");
+  assertChoice(muscleGroup, FitnessUtils.MUSCLE_GROUPS.map((item) => item.name), "grupo muscular");
+  if (!Array.isArray(raw.sets) || !raw.sets.length) throw new Error("Cada exercicio precisa de pelo menos uma serie.");
+  if (raw.sets.length > 50) throw new Error("Um exercicio excedeu o limite de series.");
+  return {
+    id: String(raw.id || crypto.randomUUID()),
+    name: cleanText(raw.name, `exercicio ${index + 1}`).slice(0, 120),
+    muscleGroup,
+    sets: raw.sets.map((set) => ({
+      id: String(set.id || crypto.randomUUID()),
+      weight: numberInRange(set.weight ?? 0, 0, 1000, "carga"),
+      reps: integerInRange(set.reps, 1, 500, "repeticoes"),
+      rir: optionalNumberInRange(set.rir, 0, 10, "RIR"),
+      completed: set.completed !== false,
+    })),
+  };
+}
+
+function normalizeFitnessCardio(raw, profileId) {
+  const performedOn = String(raw.performedOn || FitnessUtils.dateKey(new Date()));
+  assertDate(performedOn, "data do cardio");
+  const intensity = String(raw.intensity || "Moderado");
+  assertChoice(intensity, ["Leve", "Moderado", "Intenso"], "intensidade");
+  return {
+    id: String(raw.id || crypto.randomUUID()),
+    profileId,
+    performedOn,
+    modality: cleanText(raw.modality, "modalidade").slice(0, 80),
+    durationMinutes: integerInRange(raw.durationMinutes, 1, 600, "duracao do cardio"),
+    distanceKm: optionalNumberInRange(raw.distanceKm, 0, 1000, "distancia"),
+    intensity,
+    notes: String(raw.notes || "").trim().slice(0, 2000),
+  };
+}
+
+function normalizeFitnessTargets(rawTargets) {
+  if (!Array.isArray(rawTargets) || !rawTargets.length) throw new Error("Inclua as metas de volume.");
+  return rawTargets.map((raw) => {
+    const fallback = FitnessUtils.MUSCLE_GROUPS.find((item) => item.name === raw.muscleGroup);
+    if (!fallback) throw new Error("Grupo muscular invalido nas metas.");
+    const minSets = integerInRange(raw.minSets, 0, 50, "volume minimo");
+    const targetSets = integerInRange(raw.targetSets, minSets, 50, "volume ideal");
+    const maxSets = integerInRange(raw.maxSets, targetSets, 60, "volume maximo");
+    return { muscleGroup: fallback.name, color: fallback.color, minSets, targetSets, maxSets };
+  });
+}
+
+function normalizeFitnessTemplate(raw, profileId) {
+  if (!Array.isArray(raw.exercises) || !raw.exercises.length) throw new Error("O modelo precisa ter exercicios.");
+  return {
+    id: String(raw.id || crypto.randomUUID()),
+    profileId,
+    name: cleanText(raw.name, "nome do modelo").slice(0, 100),
+    exercises: raw.exercises.map((exercise, index) => {
+      const muscleGroup = cleanText(exercise.muscleGroup, "grupo muscular");
+      assertChoice(muscleGroup, FitnessUtils.MUSCLE_GROUPS.map((item) => item.name), "grupo muscular");
+      return {
+        id: String(exercise.id || crypto.randomUUID()),
+        name: cleanText(exercise.name, `exercicio ${index + 1}`).slice(0, 120),
+        muscleGroup,
+        suggestedSets: integerInRange(exercise.suggestedSets ?? 3, 1, 20, "series sugeridas"),
+      };
+    }),
+  };
+}
+
+function numberInRange(value, min, max, field) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < min || number > max) throw new Error(`Valor invalido para ${field}.`);
+  return Math.round(number * 100) / 100;
+}
+
+function optionalNumberInRange(value, min, max, field) {
+  if (value === null || value === undefined || value === "") return null;
+  return numberInRange(value, min, max, field);
+}
+
+function integerInRange(value, min, max, field) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < min || number > max) throw new Error(`Valor invalido para ${field}.`);
+  return number;
 }
 
 function getTrips() {
