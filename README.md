@@ -227,3 +227,20 @@ Formato:
   ]
 }
 ```
+
+## Contas da casa — fluxo mensal
+
+A tela inicial sempre abre no mês atual. Histórico e meses futuros continuam acessíveis em
+“Histórico e próximos meses”. Uma lista reúne contas pendentes e pagas, com filtros.
+
+- Novas contas são únicas por padrão; repetir todo mês ou ano é uma escolha explícita.
+- Editar uma recorrência afeta somente a ocorrência selecionada por padrão. “Este mês e os
+  próximos” usa a divisão de série já existente; não reescreve meses anteriores.
+- Na edição de uma ocorrência, nome e recorrência ficam protegidos por pertencerem à série.
+- “Já paguei” registra o valor exibido hoje, com o usuário atual e método não informado.
+  Para outro valor/data, ou fora do mês atual, usa-se o formulário de pagamento.
+- “Já pagas” permite desfazer. Toques simultâneos não enviam pagamentos duplicados no cliente.
+- Falta pagar soma somente contas pendentes. Sobra prevista considera valores pagos reais e
+  previsões pendentes; não representa saldo bancário nem aporte realizado.
+
+Os testes adicionais usam registros fictícios e SQLite temporário. Não modificam dados de produção.
