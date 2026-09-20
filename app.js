@@ -42,7 +42,9 @@ let bills = [];
 let billOccurrences = [];
 let revenues = [];
 let financialGoal = null;
-let selectedMonth = localStorage.getItem(STORAGE_KEYS.selectedMonth) || monthKey(new Date());
+let selectedMonth = monthKey(new Date());
+let billFilter = "pending";
+const pendingPayments = new Set();
 let currentActor = localStorage.getItem(STORAGE_KEYS.actor) || "Andre";
 let ownerFilter = localStorage.getItem(STORAGE_KEYS.ownerFilter) || "Todos";
 let lockedActor = null;
@@ -54,10 +56,6 @@ const elements = {
   summaryGrid: document.querySelector("#summaryGrid"),
   financialGoalStrip: document.querySelector("#financialGoalStrip"),
   monthlyCheckin: document.querySelector("#monthlyCheckin"),
-  urgentList: document.querySelector("#urgentList"),
-  urgentCount: document.querySelector("#urgentCount"),
-  paidList: document.querySelector("#paidList"),
-  paidCount: document.querySelector("#paidCount"),
   allBillsList: document.querySelector("#allBillsList"),
   revenueList: document.querySelector("#revenueList"),
   categoryMap: document.querySelector("#categoryMap"),
@@ -95,6 +93,20 @@ async function initializeApp() {
 }
 
 function bindEvents() {
+  document.querySelectorAll("[data-bill-filter]").forEach(button => button.addEventListener("click", () => {
+    billFilter = button.dataset.billFilter;
+    render();
+  }));
+  document.querySelector("#billEditScope").addEventListener("change", updateBillEditScope);
+  document.querySelectorAll(".sidebar-button[aria-label]").forEach(button => {
+    const section = { Contas: "householdBills", Receitas: "householdRevenues", Relatorios: "householdCategories" }[button.getAttribute("aria-label")];
+    if (section) button.addEventListener("click", () => {
+      const target = document.getElementById(section);
+      if (target.tagName === "DETAILS") target.open = true;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    if (button.getAttribute("aria-label") === "Hoje") button.addEventListener("click", () => setSelectedMonth(monthKey(new Date())));
+  });
   document.querySelector("#previousMonth").addEventListener("click", () => shiftMonth(-1));
   document.querySelector("#nextMonth").addEventListener("click", () => shiftMonth(1));
   document.querySelector("#currentMonth").addEventListener("click", () => setSelectedMonth(monthKey(new Date())));
@@ -106,7 +118,7 @@ function bindEvents() {
     button.addEventListener("click", () => openBillDialog());
   });
 
-  document.querySelectorAll("#openRevenueForm, #openRevenueFormSecondary").forEach((button) => {
+  document.querySelectorAll("#openRevenueFormSecondary").forEach((button) => {
     button.addEventListener("click", () => openRevenueDialog());
   });
 
@@ -148,6 +160,7 @@ function bindEvents() {
 
     try {
       if (action === "mark-paid") openPaymentDialog(id);
+      if (action === "quick-paid") await markPaidToday(id, actionButton);
       if (action === "undo-payment") await undoPayment(id);
       if (action === "edit-bill") openBillDialog(findBill(id));
       if (action === "delete-bill") await deleteBill(id);
@@ -256,8 +269,6 @@ function renderLoading() {
   elements.summaryGrid.innerHTML = "";
   elements.financialGoalStrip.innerHTML = "";
   elements.monthlyCheckin.innerHTML = "";
-  elements.urgentList.innerHTML = emptyTemplate("Carregando dados do SQLite...");
-  elements.paidList.innerHTML = emptyTemplate("Carregando pagamentos...");
   elements.allBillsList.innerHTML = emptyTemplate("Carregando contas...");
   elements.revenueList.innerHTML = emptyTemplate("Carregando receitas...");
   elements.categoryMap.innerHTML = emptyTemplate("Carregando categorias...");
@@ -268,8 +279,6 @@ function renderFatalError(error) {
   elements.summaryGrid.innerHTML = "";
   elements.financialGoalStrip.innerHTML = "";
   elements.monthlyCheckin.innerHTML = "";
-  elements.urgentList.innerHTML = emptyTemplate(message);
-  elements.paidList.innerHTML = emptyTemplate(message);
   elements.allBillsList.innerHTML = emptyTemplate(message);
   elements.revenueList.innerHTML = emptyTemplate(message);
   elements.categoryMap.innerHTML = emptyTemplate(message);
@@ -279,13 +288,12 @@ function renderFatalError(error) {
 function render() {
   localStorage.setItem(STORAGE_KEYS.selectedMonth, selectedMonth);
   elements.monthLabel.textContent = capitalize(monthFormatter.format(dateFromMonthKey(selectedMonth)));
+  document.querySelector("#monthContext").textContent = selectedMonth === monthKey(new Date()) ? "Este mês · contas da casa" : selectedMonth < monthKey(new Date()) ? "Histórico · mês anterior" : "Planejamento · mês futuro";
   renderActorSwitch();
   renderOwnerFilter();
   renderSummary();
   renderFinancialGoal();
   renderMonthlyCheckin();
-  renderUrgentList();
-  renderPaidList();
   renderAllBills();
   renderCategoryMap();
   renderRevenues();
@@ -313,34 +321,22 @@ async function logout() {
   window.location.href = "/login.html";
 }
 
-function renderSummary() {
+function monthlyTotals() {
   const monthBills = getVisibleMonthBills();
-  const monthRevenues = getVisibleMonthRevenues();
-  const totalIncome = sum(monthRevenues, "amount");
-  const totalBills = sum(monthBills, "amount");
-  const totalPaid = monthBills.reduce((total, bill) => total + (bill.paid ? Number(bill.paidAmount || bill.amount) : 0), 0);
-  const pending = Math.max(totalBills - totalPaid, 0);
-  const balance = totalIncome - totalBills;
+  const income = sum(getVisibleMonthRevenues(), "amount");
+  const paid = monthBills.filter(b => b.paid).reduce((total, b) => total + Math.round(Number(b.paidAmount ?? b.amount) * 100), 0) / 100;
+  const pending = monthBills.filter(b => !b.paid).reduce((total, b) => total + Math.round(Number(b.amount) * 100), 0) / 100;
+  return { income, paid, pending, total: paid + pending, balance: Math.round((income - paid - pending) * 100) / 100 };
+}
 
+function renderSummary() {
+  const totals = monthlyTotals();
   const items = [
-    { label: "Receitas previstas", value: totalIncome, icon: "wallet-cards", tone: "income" },
-    { label: "Contas do mes", value: totalBills, icon: "receipt-text", tone: "bills" },
-    { label: "Ja pago", value: totalPaid, icon: "badge-check", tone: "paid" },
-    { label: "Falta pagar", value: pending, icon: "circle-alert", tone: "pending" },
-    { label: "Saldo previsto", value: balance, icon: "landmark", tone: "balance" },
+    { label: "Falta pagar", value: totals.pending, tone: "pending" },
+    { label: "Já pago", value: totals.paid, tone: "paid" },
+    { label: "Sobra prevista", value: totals.balance, tone: "balance" },
   ];
-
-  elements.summaryGrid.innerHTML = items
-    .map(
-      (item) => `
-        <article class="summary-card ${item.tone}">
-          <div class="summary-icon" aria-hidden="true"><i data-lucide="${item.icon}"></i></div>
-          <strong>${currency.format(item.value)}</strong>
-          <span>${item.label}</span>
-        </article>
-      `,
-    )
-    .join("");
+  elements.summaryGrid.innerHTML = items.map(item => `<article class="summary-card ${item.tone}"><span>${item.label}</span><strong>${currency.format(item.value)}</strong></article>`).join("");
 }
 
 function renderFinancialGoal() {
@@ -383,87 +379,20 @@ function renderFinancialGoal() {
 }
 
 function renderMonthlyCheckin() {
+  const totals = monthlyTotals();
   const monthBills = getVisibleMonthBills();
-  const monthRevenues = getVisibleMonthRevenues();
-  const totalIncome = sum(monthRevenues, "amount");
-  const totalBills = sum(monthBills, "amount");
-  const totalPaid = monthBills.reduce((total, bill) => total + (bill.paid ? Number(bill.paidAmount || bill.amount) : 0), 0);
-  const available = totalIncome - totalBills;
-  const commitment = totalIncome > 0 ? (totalBills / totalIncome) * 100 : 0;
-  const paymentProgress = totalBills > 0 ? (totalPaid / totalBills) * 100 : 0;
-  const overdue = monthBills.filter((bill) => !bill.paid && statusForBill(bill).tone === "overdue");
-  const overdueAmount = sum(overdue, "amount");
-
-  elements.monthlyCheckin.innerHTML = `
-    <div class="checkin-panel">
-      <div class="checkin-header">
-        <div>
-          <p class="eyebrow">Check-in do casal</p>
-          <h3>O que o mes esta dizendo</h3>
-        </div>
-        <div class="checkin-actions">
-          <button class="compact-button" data-quick-action="revenue">
-            <i data-lucide="wallet-cards"></i>
-            Receita
-          </button>
-          <button class="compact-button" data-quick-action="bill">
-            <i data-lucide="plus"></i>
-            Conta
-          </button>
-        </div>
-      </div>
-      <div class="checkin-grid">
-        <div class="checkin-metric ${available < 0 ? "is-alert" : "is-positive"}">
-          <span>Depois das contas</span>
-          <strong>${currency.format(available)}</strong>
-          <small>${available < 0 ? "Orcamento acima da renda" : "Disponivel no previsto"}</small>
-        </div>
-        <div class="checkin-metric ${commitment > 80 ? "is-alert" : ""}">
-          <span>Renda comprometida</span>
-          <strong>${Math.round(commitment)}%</strong>
-          <small>${currency.format(totalBills)} em contas</small>
-        </div>
-        <div class="checkin-metric">
-          <span>Pagamentos concluidos</span>
-          <strong>${Math.round(paymentProgress)}%</strong>
-          <small>${currency.format(totalPaid)} pago</small>
-        </div>
-      </div>
-      <div class="checkin-status ${overdue.length ? "is-alert" : "is-clear"}">
-        <i data-lucide="${overdue.length ? "circle-alert" : "circle-check"}"></i>
-        <span>${
-          overdue.length
-            ? `${overdue.length} ${overdue.length === 1 ? "conta atrasada" : "contas atrasadas"}, somando ${currency.format(overdueAmount)}.`
-            : "Nenhuma conta atrasada neste recorte."
-        }</span>
-      </div>
-    </div>
-  `;
-}
-
-function renderUrgentList() {
-  const unpaid = getVisibleMonthBills()
-    .filter((bill) => !bill.paid)
-    .sort((a, b) => dateFromKey(a.dueDate) - dateFromKey(b.dueDate));
-
-  const urgent = unpaid.filter((bill) => ["overdue", "today", "due-soon"].includes(statusForBill(bill).tone));
-  const visible = [...urgent, ...unpaid.filter((bill) => !urgent.includes(bill))].slice(0, 6);
-
-  elements.urgentCount.textContent = unpaid.length;
-  elements.urgentList.innerHTML = visible.length
-    ? visible.map((bill) => billTemplate(bill, { prominentPay: true })).join("")
-    : emptyTemplate("Nenhuma conta pendente neste mes.");
-}
-
-function renderPaidList() {
-  const paid = getVisibleMonthBills()
-    .filter((bill) => bill.paid)
-    .sort((a, b) => dateFromKey(b.paidDate || b.dueDate) - dateFromKey(a.paidDate || a.dueDate));
-
-  elements.paidCount.textContent = paid.length;
-  elements.paidList.innerHTML = paid.length
-    ? paid.map((bill) => billTemplate(bill, { compact: true })).join("")
-    : emptyTemplate("Nenhum pagamento registrado neste mes.");
+  const pending = monthBills.filter(b => !b.paid);
+  const overdue = pending.filter(b => statusForBill(b).tone === "overdue");
+  const title = overdue.length ? `${overdue.length} ${overdue.length === 1 ? "conta precisa" : "contas precisam"} da sua atenção` : pending.length ? `${pending.length} ${pending.length === 1 ? "conta para organizar" : "contas para organizar"}` : "Tudo pago neste mês";
+  const contribution = Number(financialGoal?.monthlyContribution || 0);
+  let guidance = "A previsão usa as receitas e contas cadastradas. Não é o saldo bancário nem um aporte realizado.";
+  if (ownerFilter === "Todos" && contribution > 0) {
+    const difference = Math.round((contribution - totals.balance) * 100) / 100;
+    guidance = difference > 0 ? `A sobra prevista está ${currency.format(difference)} abaixo do aporte planejado de ${currency.format(contribution)}. Confira os valores do mês antes de reservar.` : `Pelos lançamentos, o aporte planejado de ${currency.format(contribution)} cabe no mês. Confirme os valores antes de reservar.`;
+  } else if (ownerFilter !== "Todos") {
+    guidance = "Este resumo está filtrado por responsável. Selecione Todos para acompanhar a casa inteira.";
+  }
+  elements.monthlyCheckin.innerHTML = `<div class="household-advisor"><div><h3>${monthBills.length ? title : "Vamos organizar este mês?"}</h3><p>${escapeHtml(guidance)}</p><small>Receitas previstas: ${currency.format(totals.income)} · Despesas: ${currency.format(totals.total)}</small></div><button class="compact-button" data-quick-action="revenue">Adicionar receita</button></div>`;
 }
 
 function renderAllBills() {
@@ -472,9 +401,15 @@ function renderAllBills() {
     return dateFromKey(a.dueDate) - dateFromKey(b.dueDate);
   });
 
-  elements.allBillsList.innerHTML = monthBills.length
-    ? monthBills.map((bill) => billTemplate(bill)).join("")
-    : emptyTemplate("Sem contas cadastradas para este mes.");
+  const visible = monthBills.filter(bill => billFilter === "all" || (billFilter === "paid" ? bill.paid : !bill.paid));
+  document.querySelectorAll("[data-bill-filter]").forEach(button => {
+    const active = button.dataset.billFilter === billFilter;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  elements.allBillsList.innerHTML = visible.length
+    ? visible.map((bill) => billTemplate(bill, { prominentPay: true })).join("")
+    : emptyTemplate(billFilter === "paid" ? "Nenhum pagamento registrado neste mês." : billFilter === "pending" ? "Nenhuma conta pendente neste mês." : "Sem contas cadastradas para este mês.");
 }
 
 function renderCategoryMap() {
@@ -556,9 +491,9 @@ function billTemplate(bill, options = {}) {
     `
     : options.prominentPay
       ? `
-        <button class="mark-button" data-action="mark-paid">
+        <button class="mark-button" data-action="quick-paid">
           <i data-lucide="check"></i>
-          Pagar
+          Já paguei
         </button>
       `
       : `
@@ -583,8 +518,9 @@ function billTemplate(bill, options = {}) {
         </div>
       </div>
       <div class="bill-actions">
-        <span class="bill-value">${currency.format(Number(bill.paid ? bill.paidAmount || bill.amount : bill.amount))}</span>
+        <span class="bill-value">${currency.format(Number(bill.paid ? bill.paidAmount ?? bill.amount : bill.amount))}</span>
         ${payButton}
+        ${!bill.paid ? '<button class="text-button payment-details-button" data-action="mark-paid">Detalhes do pagamento</button>' : ""}
         <button class="icon-button" data-action="edit-bill" title="Editar conta" aria-label="Editar conta">
           <i data-lucide="pencil"></i>
         </button>
@@ -599,18 +535,64 @@ function billTemplate(bill, options = {}) {
 function openBillDialog(bill = null) {
   elements.billForm.reset();
   document.querySelector("#billId").value = bill?.id || "";
-  elements.billDialogTitle.textContent = bill ? "Editar conta" : "Nova conta";
+  elements.billDialogTitle.textContent = bill ? "Ajustar conta do mês" : "Adicionar conta";
+  document.querySelector("#billEditScope").value = "one";
+  document.querySelector("#billEditScopeField").hidden = !bill?.isRecurringOccurrence;
 
   document.querySelector("#billName").value = bill?.name || "";
   document.querySelector("#billAmount").value = bill?.amount ?? "";
-  document.querySelector("#billDueDate").value = bill?.dueDate || `${selectedMonth}-10`;
+  document.querySelector("#billDueDate").value = bill?.dueDate || (selectedMonth === monthKey(new Date()) ? todayKey() : `${selectedMonth}-01`);
   document.querySelector("#billCategory").value = bill?.category || "Moradia";
   document.querySelector("#billOwner").value = bill?.owner || "Ambos";
-  document.querySelector("#billRecurrence").value = bill?.recurrence || "Mensal";
+  document.querySelector("#billRecurrence").value = bill?.recurrence || "Unica";
   document.querySelector("#billInitialStatus").value = bill?.paid ? "paid" : "pending";
   document.querySelector("#billNotes").value = bill?.notes || "";
 
+  updateBillEditScope();
   elements.billDialog.showModal();
+}
+
+function updateBillEditScope() {
+  const bill = findBill(document.querySelector("#billId").value);
+  const recurring = Boolean(bill?.isRecurringOccurrence);
+  const onlyThisMonth = recurring && document.querySelector("#billEditScope").value === "one";
+  const name = document.querySelector("#billName");
+  name.readOnly = onlyThisMonth;
+  if (onlyThisMonth) {
+    name.value = bill.name;
+    document.querySelector("#billRecurrence").value = bill.recurrence;
+  }
+  document.querySelector("#billInitialStatus").disabled = Boolean(bill?.paid);
+  document.querySelector("#billRecurrence").disabled = onlyThisMonth;
+  const date = document.querySelector("#billDueDate");
+  date.min = recurring ? `${bill.competence}-01` : "";
+  date.max = recurring ? dateKey(new Date(Number(bill.competence.slice(0,4)), Number(bill.competence.slice(5)), 0)) : "";
+  document.querySelector("#billContext").textContent = onlyThisMonth
+    ? `Conta de ${monthFormatter.format(dateFromMonthKey(bill.competence))}. Valor, vencimento e observação mudam somente aqui. Para mudar o nome ou a repetição, escolha Este mês e os próximos.`
+    : recurring ? "As mudanças valem deste mês em diante. Meses anteriores permanecem preservados." : "Comece pelo nome, valor e vencimento. A conta só se repete se você escolher.";
+}
+
+async function markPaidToday(id, button) {
+  const bill = findBill(id);
+  if (!bill || bill.paid || pendingPayments.has(id)) return;
+  if (monthKey(dateFromKey(bill.dueDate)) !== monthKey(new Date())) {
+    openPaymentDialog(id);
+    return;
+  }
+  pendingPayments.add(id);
+  if (button) button.disabled = true;
+  try {
+    await apiRequest(`/api/bills/${encodeURIComponent(id)}/payment`, {
+      method: "PATCH",
+      body: { amount: bill.amount, date: todayKey(), by: currentActor, method: "Nao informado", notes: "", updatedBy: currentActor },
+    });
+    await refreshState();
+    render();
+    showToast("Pagamento registrado. Em Já pagas, você pode desfazer.");
+  } finally {
+    pendingPayments.delete(id);
+    if (button) button.disabled = false;
+  }
 }
 
 async function saveBillFromForm(event) {
@@ -623,8 +605,9 @@ async function saveBillFromForm(event) {
     let targetMonth = monthKey(dateFromKey(payload.dueDate));
 
     if (existing?.isRecurringOccurrence) {
-      const scope = await chooseRecurrenceScope("edit", existing);
-      if (!scope) return;
+      const scope = document.querySelector("#billEditScope").value;
+      if (!["one", "future"].includes(scope)) throw new Error("Escolha o alcance da alteração.");
+      if (monthKey(dateFromKey(payload.dueDate)) !== existing.competence) throw new Error("Escolha um vencimento dentro do mês desta conta.");
       targetMonth = await saveRecurringBillEdit(existing, payload, scope);
     } else {
       await apiRequest("/api/bills", { method: "POST", body: payload });
@@ -634,7 +617,7 @@ async function saveBillFromForm(event) {
     await refreshState();
     elements.billDialog.close();
     render();
-    showToast("Conta salva no SQLite.");
+    showToast(existing?.isRecurringOccurrence ? "Conta atualizada no período escolhido." : "Conta adicionada.");
   } catch (error) {
     showToast(error.message || "Nao foi possivel salvar a conta.");
   }
@@ -645,10 +628,11 @@ function openPaymentDialog(id) {
   if (!bill) return;
 
   document.querySelector("#paymentBillId").value = bill.id;
-  document.querySelector("#paymentAmount").value = bill.paidAmount || bill.amount;
+  document.querySelector("#paymentContext").textContent = `${bill.name} · conta de ${monthFormatter.format(dateFromKey(bill.dueDate))}`;
+  document.querySelector("#paymentAmount").value = bill.paidAmount ?? bill.amount;
   document.querySelector("#paymentDate").value = todayKey();
   document.querySelector("#paymentBy").value = currentActor;
-  document.querySelector("#paymentMethod").value = bill.paymentMethod || "Pix";
+  document.querySelector("#paymentMethod").value = bill.paymentMethod || "Nao informado";
   document.querySelector("#paymentNotes").value = bill.paymentNotes || "";
 
   elements.paymentDialog.showModal();
@@ -726,7 +710,7 @@ function buildBillPayloadFromForm(existing, id) {
     recurrenceUntil: recurrence === "Unica" ? null : existing?.recurrenceUntil || null,
     notes: document.querySelector("#billNotes").value.trim(),
     paid,
-    paidAmount: existing?.paidAmount || (paid ? amount : null),
+    paidAmount: existing?.paidAmount ?? (paid ? amount : null),
     paidDate: existing?.paidDate || (paid ? today : null),
     paidBy: existing?.paidBy || (paid ? currentActor : null),
     paymentMethod: existing?.paymentMethod || (paid ? "Pix" : null),
@@ -817,7 +801,7 @@ function occurrencePayloadFromBill(existing, payload) {
     owner: scopedPayload.owner,
     notes: scopedPayload.notes,
     paid: scopedPayload.paid,
-    paidAmount: scopedPayload.paid ? scopedPayload.paidAmount || scopedPayload.amount : null,
+    paidAmount: scopedPayload.paid ? scopedPayload.paidAmount ?? scopedPayload.amount : null,
     paidDate: scopedPayload.paid ? scopedPayload.paidDate || todayKey() : null,
     paidBy: scopedPayload.paid ? scopedPayload.paidBy || currentActor : null,
     paymentMethod: scopedPayload.paid ? scopedPayload.paymentMethod || "Pix" : null,
