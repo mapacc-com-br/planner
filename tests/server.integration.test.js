@@ -382,3 +382,22 @@ function createLegacyDatabase(filePath) {
   `);
   database.close();
 }
+
+test('ajuste e pagamento mensal preservam a conta base e a ocorrência de outro mês', async () => {
+  const base = { id:'recurrence-monthly-test',name:'Luz teste',amount:100,dueDate:'2026-07-31',category:'Moradia',owner:'Ambos',recurrence:'Mensal',notes:'',paid:false,createdBy:'Andre',updatedBy:'Andre' };
+  await request('/api/bills',{method:'POST',body:base});
+  await request('/api/bill-occurrences',{method:'POST',body:{parentId:base.id,competence:'2026-08',dueDate:'2026-08-31',amount:110,paid:false,updatedBy:'Andre'}});
+  await request('/api/bill-occurrences',{method:'POST',body:{parentId:base.id,competence:'2026-09',dueDate:'2026-09-30',amount:128.55,paid:false,updatedBy:'Andre'}});
+  let state = await request('/api/state');
+  const occurrence = state.billOccurrences.find(o=>o.parentId===base.id && o.competence==='2026-09');
+  await request(`/api/bills/${encodeURIComponent(occurrence.id)}/payment`,{method:'PATCH',body:{amount:128.55,date:'2026-09-20',by:'Andre',method:'Nao informado',updatedBy:'Andre'}});
+  state = await request('/api/state');
+  assert.equal(state.bills.find(b=>b.id===base.id).amount,100);
+  assert.equal(state.billOccurrences.find(o=>o.parentId===base.id && o.competence==='2026-08').paid,false);
+  assert.equal(state.billOccurrences.find(o=>o.parentId===base.id && o.competence==='2026-09').paid,true);
+  assert.equal(state.billOccurrences.find(o=>o.parentId===base.id && o.competence==='2026-09').paidAmount,128.55);
+  await request(`/api/bills/${encodeURIComponent(occurrence.id)}/unpay`,{method:'PATCH',body:{updatedBy:'Andre'}});
+  state=await request('/api/state');
+  assert.equal(state.billOccurrences.find(o=>o.parentId===base.id && o.competence==='2026-09').paid,false);
+  assert.equal(state.billOccurrences.find(o=>o.parentId===base.id && o.competence==='2026-09').amount,128.55);
+});
