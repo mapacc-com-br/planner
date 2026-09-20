@@ -4799,3 +4799,63 @@ button.fitness-template-card {
     animation: none;
   }
 }
+
+/* Contas da casa: foco no mês atual, sem alterar as outras áreas. */
+.household-planner [hidden] { display: none !important; }
+.household-planner .topbar { align-items: center; }
+.household-menu { position: relative; flex-shrink: 0; }
+.household-menu > summary, .month-history > summary, .household-details > summary { cursor: pointer; padding: 12px; font-weight: 700; font-size: 14px; }
+.household-menu[open] > .top-actions { position: absolute; right: 0; top: 44px; z-index: 30; padding: 16px; width: 280px; display: grid; gap: 10px; background: #fff; border: 1px solid #c8d9e8; border-radius: 16px; box-shadow: 0 12px 32px #18354b26; }
+.household-menu .actor-switch { width: 100%; }
+.household-planner .month-strip { background: #fff; color: #153b5b; border: 1px solid #d4e1ec; padding: 20px 24px; box-shadow: none; }
+.household-planner .month-strip::before, .household-planner .month-strip::after { display: none; }
+.household-planner .month-strip .eyebrow { color: #54748b; }
+.household-planner .month-strip h2 { font-size: clamp(22px, 4vw, 30px); }
+.household-planner .month-strip .owner-filter { background: #edf4fa; border-color: #d3e2ee; }
+.household-planner .month-strip .owner-filter-button { color: #355e7b; }
+.household-planner .month-strip .owner-filter-button.is-active { color: #fff; background: #2478c7; }
+.household-planner .month-actions { padding: 10px 0 0; }
+.household-planner .month-actions button { color: #245477; border: 1px solid #ccdeeb; background: #f1f6fa; }
+.household-planner .summary-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.household-planner .summary-card { min-height: 0; padding: 20px; gap: 7px; }
+.household-planner .summary-card strong { font-size: clamp(21px, 2.7vw, 30px); overflow-wrap: anywhere; }
+.household-advisor { padding: 18px 22px; margin-bottom: 22px; background: #edf7f4; border: 1px solid #c8e1d9; border-radius: 16px; display: flex; align-items: center; gap: 20px; justify-content: space-between; }
+.household-advisor h3 { margin: 0 0 7px; font-size: 19px; }
+.household-advisor p { margin: 0 0 9px; line-height: 1.5; font-size: 16px; }
+.household-advisor small { font-size: 14px; color: #48667b; }
+.household-advisor button { flex-shrink: 0; }
+.bill-filters { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 8px; }
+.bill-filters .text-button { border: 1px solid #c7dae9; background: #f5f9fc; color: #31516a; min-height: 44px; }
+.bill-filters .text-button.is-active { background: #2478c7; color: #fff; border-color: #2478c7; }
+.household-hint { font-size: 14px; line-height: 1.5; color: #526d80; margin: 0 0 16px; }
+#householdBills > .household-hint { padding: 0 20px; }
+.household-planner .bill-actions { flex-wrap: wrap; }
+.household-planner .bill-actions .payment-details-button { font-size: 14px; color: #315e81; }
+.household-planner .bill-actions .mark-button { min-height: 44px; }
+.household-planner .bill-value { flex-basis: 100%; text-align: right; }
+.household-details { border: 1px solid #d4e1ec; background: #fff; border-radius: 16px; overflow: hidden; }
+.household-details > summary { padding: 18px 20px; }
+.household-details .category-map { padding: 0 20px 20px; }
+.household-details .goal-strip { margin: 0; box-shadow: none; }
+.household-planner input[readonly], .household-planner select:disabled { background: #edf2f7; color: #536a7d; }
+.household-planner summary:focus-visible { outline: 3px solid #2478c7; outline-offset: 3px; }
+@media(max-width: 760px) {
+  .household-planner .topbar { flex-direction: row; gap: 8px; padding-bottom: 12px; }
+  .household-planner .brand-mark, .household-planner .brand-block .eyebrow { display: none; }
+  .household-planner .brand-block h1 { font-size: 23px; }
+  .household-menu > summary { font-size: 14px; padding: 12px 6px; }
+  .household-planner .month-strip { padding: 16px; gap: 12px; }
+  .household-planner .month-controls { gap: 8px; }
+  .household-planner .summary-grid { gap: 8px; }
+  .household-planner .summary-card { padding: 12px 8px; }
+  .household-planner .summary-card strong { font-size: clamp(17px, 4vw, 23px); letter-spacing: -.3px; }
+  .household-planner .summary-card span { font-size: 13px; }
+  .household-advisor { flex-direction: column; align-items: stretch; padding: 16px; gap: 12px; }
+  .household-planner .ledger-grid { display: flex; flex-direction: column; }
+  .household-planner .bill-actions { justify-content: flex-start; }
+  .household-planner .bill-value { text-align: left; }
+  .household-planner .panel-header { flex-wrap: wrap; }
+  .household-planner .month-actions { display: flex; }
+  .household-planner .month-actions .text-button { flex: 1; }
+}
+@media(max-width: 380px) { .household-planner .summary-grid { grid-template-columns: 1fr; } }
