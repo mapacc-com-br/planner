@@ -6,7 +6,7 @@
     <title>Planner financeiro</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="household-planner">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Navegacao principal">
         <div class="sidebar-mark" aria-hidden="true">
@@ -68,7 +68,7 @@
             </div>
           </div>
 
-          <div class="top-actions">
+          <details class="household-menu"><summary>Menu da casa</summary><div class="top-actions">
             <a class="compact-button fitness-launch-button" href="./academia.html">
               <i data-lucide="dumbbell"></i>
               Academia
@@ -89,12 +89,12 @@
               <button class="actor-button is-active" data-actor="Andre">Andre</button>
               <button class="actor-button" data-actor="Luciana">Luciana</button>
             </div>
-          </div>
+          </div></details>
         </header>
 
         <section class="month-strip" aria-label="Selecionar mes">
           <div>
-            <p class="eyebrow">Mapa financeiro do mes</p>
+            <p class="eyebrow" id="monthContext">Este mês</p>
             <h2 id="monthLabel">Julho de 2026</h2>
           </div>
           <div class="month-controls">
@@ -104,89 +104,43 @@
               <button class="owner-filter-button" data-owner-filter="Luciana">Luciana</button>
               <button class="owner-filter-button" data-owner-filter="Ambos">Ambos</button>
             </div>
-            <div class="month-actions">
+            <details class="month-history"><summary>Histórico e próximos meses</summary><div class="month-actions">
               <button class="icon-button" id="previousMonth" title="Mes anterior" aria-label="Mes anterior">
                 <i data-lucide="chevron-left"></i>
               </button>
-              <button class="text-button" id="currentMonth">Hoje</button>
+              <button class="text-button" id="currentMonth">Voltar a este mês</button>
               <button class="icon-button" id="nextMonth" title="Proximo mes" aria-label="Proximo mes">
                 <i data-lucide="chevron-right"></i>
               </button>
             </div>
-          </div>
+          </details></div>
         </section>
-
-        <section id="financialGoalStrip" aria-label="Meta patrimonial"></section>
 
         <section class="summary-grid" id="summaryGrid" aria-label="Resumo financeiro"></section>
 
         <section id="monthlyCheckin" aria-label="Check-in financeiro do casal"></section>
 
-        <section class="focus-grid">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">Prioridade</p>
-                <h3>Para pagar agora</h3>
-              </div>
-              <span class="count-pill" id="urgentCount">0</span>
-            </div>
-            <div class="bill-list" id="urgentList"></div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <p class="eyebrow">Categorias</p>
-                <h3>Visao do mes</h3>
-              </div>
-              <button class="icon-button" id="openRevenueForm" title="Nova receita" aria-label="Nova receita">
-                <i data-lucide="plus"></i>
-              </button>
-            </div>
-            <div class="category-map" id="categoryMap"></div>
-          </section>
-        </section>
-
         <section class="ledger-grid">
-          <section class="panel">
+          <section class="panel" id="householdBills">
             <div class="panel-header">
-              <div>
-                <p class="eyebrow">Contas</p>
-                <h3>Movimentos do mes</h3>
-              </div>
-              <button class="compact-button" id="openBillForm">
-                <i data-lucide="plus"></i>
-                Nova conta
-              </button>
+              <div><p class="eyebrow">Sua casa em dia</p><h3>Contas do mês</h3></div>
+              <button class="compact-button" id="openBillForm"><i data-lucide="plus"></i>Nova conta</button>
             </div>
+            <div class="bill-filters" role="group" aria-label="Situação das contas">
+              <button type="button" class="text-button is-active" data-bill-filter="pending" aria-pressed="true">Falta pagar</button>
+              <button type="button" class="text-button" data-bill-filter="paid" aria-pressed="false">Já pagas</button>
+              <button type="button" class="text-button" data-bill-filter="all" aria-pressed="false">Todas</button>
+            </div>
+            <p class="household-hint">Use “Já paguei” para registrar o valor mostrado, na data de hoje. Para outro valor ou data, abra “Detalhes do pagamento”.</p>
             <div class="bill-list dense" id="allBillsList"></div>
           </section>
-
           <section class="side-stack">
-            <section class="panel">
-              <div class="panel-header">
-                <div>
-                  <p class="eyebrow">Pagamentos</p>
-                  <h3>Ja pagas</h3>
-                </div>
-                <span class="count-pill positive" id="paidCount">0</span>
-              </div>
-              <div class="bill-list compact" id="paidList"></div>
-            </section>
-
-            <section class="panel">
-              <div class="panel-header">
-                <div>
-                  <p class="eyebrow">Entradas</p>
-                  <h3>Receitas</h3>
-                </div>
-                <button class="icon-button" id="openRevenueFormSecondary" title="Nova receita" aria-label="Nova receita">
-                  <i data-lucide="plus"></i>
-                </button>
-              </div>
+            <section class="panel" id="householdRevenues">
+              <div class="panel-header"><div><p class="eyebrow">Entradas</p><h3>Receitas do mês</h3></div><button class="icon-button" id="openRevenueFormSecondary" title="Nova receita" aria-label="Nova receita"><i data-lucide="plus"></i></button></div>
               <div class="revenue-list" id="revenueList"></div>
             </section>
+            <details class="panel household-details" id="householdCategories"><summary>Despesas por categoria</summary><div class="category-map" id="categoryMap"></div></details>
+            <details class="household-details"><summary>Acompanhar a meta patrimonial</summary><section id="financialGoalStrip" aria-label="Meta patrimonial"></section></details>
           </section>
         </section>
       </main>
@@ -212,6 +166,8 @@
         </div>
 
         <input type="hidden" id="billId" />
+        <p class="household-hint" id="billContext"></p>
+        <label class="field" id="billEditScopeField" hidden><span>Aplicar alteração</span><select id="billEditScope"><option value="one">Somente a conta deste mês</option><option value="future">Este mês e os próximos</option></select></label>
 
         <label class="field">
           <span>Nome</span>
@@ -246,18 +202,18 @@
 
         <div class="form-grid">
           <label class="field">
-            <span>Recorrencia</span>
+            <span>Repetir esta conta?</span>
             <select id="billRecurrence" name="billRecurrence">
-              <option value="Unica">Unica</option>
-              <option value="Mensal">Mensal</option>
-              <option value="Anual">Anual</option>
+              <option value="Unica">Não, somente desta vez</option>
+              <option value="Mensal">Todo mês</option>
+              <option value="Anual">Todo ano</option>
             </select>
           </label>
           <label class="field">
-            <span>Status inicial</span>
+            <span>Pagamento</span>
             <select id="billInitialStatus" name="billInitialStatus">
-              <option value="pending">Pendente</option>
-              <option value="paid">Paga</option>
+              <option value="pending">Ainda não paguei</option>
+              <option value="paid">Já paguei</option>
             </select>
           </label>
         </div>
@@ -289,7 +245,7 @@
           </button>
         </div>
 
-        <input type="hidden" id="paymentBillId" />
+        <input type="hidden" id="paymentBillId" /><p class="household-hint" id="paymentContext"></p>
 
         <div class="form-grid">
           <label class="field">
@@ -312,7 +268,7 @@
           </label>
           <label class="field">
             <span>Metodo</span>
-            <select id="paymentMethod">
+            <select id="paymentMethod"><option value="Nao informado">Não informado</option>
               <option value="Pix">Pix</option>
               <option value="Debito">Debito</option>
               <option value="Credito">Credito</option>
